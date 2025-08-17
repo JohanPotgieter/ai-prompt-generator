@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="genAI.png" rel="icon" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <title>Gen AI Prompt Constructor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        textarea, select, input[type="text"] { /* Added input[type="text"] */
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px; /* Adjusted margin-bottom for consistency */
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            min-height: 40px; /* Ensure inputs have a min-height */
+            resize: vertical;
+        }
+        textarea {
+            min-height: 100px; /* Specific min-height for textareas */
+        }
+        select {
+            min-height: auto;
+            height: 40px;
+            /* margin-bottom: 30px; Keep margin-bottom consistent with other inputs */
+            background-color: #f8f8f8;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .section-title {
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            color: #555;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            margin-top: 20px;
+        }
+        .method-section {
+            display: none;
+        }
+        .method-section.active {
+            display: block;
+        }
+        ul {
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+        ul li {
+            margin-bottom: 5px;
+        }
+
+        /* --- Updated Banner/Alert Styles --- */
+        .alert {
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            position: relative;
+            opacity: 1;
+            transition: opacity 0.6s;
+        }
+        .alert.success { background-color: #d4edda; color: #155724; border-color: #c3e6cb;}
+        .alert.warning { background-color: #fff3cd; color: #856404; border-color: #ffeeba;}
+        .alert.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;}
+        .closebtn {
+            margin-left: 15px;
+            color: inherit;
+            font-weight: bold;
+            float: right;
+            font-size: 22px;
+            line-height: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .closebtn:hover {
+            opacity: 0.7;
+        }
+
+
+        /* --- Accordion Styles --- */
+        /* Apply to both session and search results containers */
+        #sessionPromptHistoryContainer, #searchResultsContainer {
+            margin-top: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 1px;
+        }
+        .accordion-item {
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .accordion-item:last-child {
+            border-bottom: none;
+        }
+        .accordion-button {
+            background-color: #f8f9fa;
+            color: #495057;
+            cursor: pointer;
+            padding: 15px 20px;
+            width: 100%;
+            text-align: left;
+            border: none;
+            outline: none;
+            transition: background-color 0.3s ease;
+            font-size: 1.1em;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0;
+        }
+        .accordion-button:hover {
+            background-color: #e2e6ea;
+        }
+        .accordion-button.active {
+            background-color: #e9ecef;
+            color: #0056b3;
+        }
+        .accordion-button:after {
+            content: '\02795'; /* Plus icon */
+            font-size: 0.8em;
+            color: #777;
+            float: right;
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+        }
+        .accordion-button.active:after {
+            content: '\2796'; /* Minus icon */
+            transform: rotate(0deg);
+        }
+        .accordion-panel {
+            padding: 0 20px;
+            background-color: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            box-sizing: border-box;
+            padding-bottom: 0;
+        }
+        .accordion-panel.active {
+            padding-top: 15px;
+            padding-bottom: 15px;
+        }
+        .accordion-panel pre {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            font-size: 0.9em;
+            position: relative;
+            margin: 0;
+            line-height: 1.4em;
+        }
+        .button-group {
+            text-align: right;
+            margin-top: 15px;
+        }
+        .button-group button {
+            padding: 8px 15px;
+            font-size: 14px;
+            margin-left: 10px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .copy-button {
+            background-color: #28a745 !important;
+            color: white !important;
+        }
+        .copy-button:hover {
+            background-color: #218838 !important;
+        }
+        .clear-all-db-prompts {
+            background-color: #dc3545;
+            margin-top: 20px;
+        }
+        .clear-all-db-prompts:hover {
+            background-color: #c82333;
+        }
+        .no-prompts-message {
+            text-align: center;
+            color: #6c757d;
+            padding: 20px;
+        }
+        .checkbox-container {
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        .checkbox-container label {
+            display: inline;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+
+        /* --- Styles for new Search & Manage section --- */
+        .search-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: flex-end; /* Align items to the bottom of the container */
+        }
+        .search-controls > div {
+            flex-grow: 1;
+            flex-basis: 0;
+            min-width: 150px;
+            margin-bottom: 0;
+        }
+        .search-controls label {
+            margin-bottom: 8px;
+        }
+        .search-controls select,
+        .search-controls input[type="text"] {
+            margin-bottom: 0; /* Remove bottom margin from inputs within flex container */
+        }
+        .search-controls button {
+            margin-top: 0;
+            margin-bottom: 0;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .search-results-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px dashed #eee;
+            background-color: #fdfdfd;
+        }
+        .search-results-item:last-child {
+            border-bottom: none;
+        }
+        .search-results-item strong {
+            color: #0056b3;
+            font-size: 1.1em;
+        }
+        .search-results-item span {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        .search-item-actions button {
+            padding: 5px 10px;
+            font-size: 13px;
+            margin-left: 8px;
+            border-radius: 3px;
+        }
+        .load-button {
+            background-color: #17a2b8 !important;
+        }
+        .load-button:hover {
+            background-color: #138496 !important;
+        }
+        .delete-button {
+            background-color: #dc3545 !important;
+        }
+        .delete-button:hover {
+            background-color: #c82333 !important;
+        }
+        .pagination-controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .pagination-controls button {
+            padding: 8px 15px;
+            margin: 0 5px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-controls button:disabled {
+            background-color: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+        .pagination-controls span {
+            font-weight: bold;
+            margin: 0 10px;
+        }
+        /* --- Tooltip Styles --- */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            color: #007bff;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 400px;
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%; /* show above */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85em;
+            line-height: 1.4em;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }        
+        .tooltip i.tooltip-icon {
+            font-size: 22px;
+            color: #007bff;
+            margin-left: 6px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .tooltip i.tooltip-icon:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="alert-banner" class="alert" style="display: none;">
+            <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+            <span id="alert-message"></span>
+        </div>
+        <h1>Gen AI Prompt Constructor</h1>
+        <label for="methodSelector">Select Prompt Method:</label>
+        <select id="methodSelector" onchange="showMethodFields()">
+            <option value="tcrei">TCREI Method (Text Generation)</option>
+            <option value="design">DESIGN Method (Image Generation)</option>
+        </select>
+        <hr>
+        <div id="tcreiMethod" class="method-section active">
+          <h2>TCREI Method (Text Generation)</h2>
+          <p>Using Google's TCREI Method:</p>
+          <ul>
+            <li><strong>T</strong>houghtfully: Describe your <strong>task</strong>, specifying a persona and format preference.</li>
+            <li><strong>C</strong>reate: Include any <strong>context</strong> the gen AI tool might need to give you what you want.</li>
+            <li><strong>R</strong>eally: Add <strong>references</strong> the gen AI tool can use to inform its output.</li>
+            <li><strong>E</strong>xcellent: Next, <strong>evaluate</strong> the output to identify opportunities for improvement. (This step is for you after generation)</li>
+            <li><strong>I</strong>nputs: Then, <strong>iterate</strong> on your initial prompt to attain those improvements. (This step is for you after generation)</li>
+          </ul>
+
+          <!-- Thoughtfully (Task) -->
+          <div class="section-title">Thoughtfully (Task)</div>
+          <label for="tcrei_task">
+            Describe your task (What you want the AI to do):
+            <span class="tooltip">
+              <i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+              <span class="tooltiptext">
+                • As a senior marketing manager, write a blog post draft explaining cloud computing to small businesses<br>
+                • Summarize a research paper into a 1-page executive brief<br>
+                • Draft 10 catchy taglines for a new eco-friendly detergent<br>
+                • Translate a product description from English to Spanish in a friendly tone<br>
+                • Write a script for a 2-minute explainer video on renewable energy<br>
+                • Generate 15 quiz questions based on a given article (with answers)<br>
+                • Rewrite this press release in simpler, more engaging language<br>
+                • Compose a cover letter tailored to a software engineering job<br>
+                • Draft a speech introduction for a keynote speaker<br>
+                • Create a story outline for a fantasy short story (3 acts)<br>
+              </span>
+            </span>
+          </label>
+          <textarea id="tcrei_task" placeholder="e.g., 'As a senior marketing manager, write a compelling blog post draft, explaining the benefits of cloud computing to small businesses.'"></textarea>
+
+          <!-- Specify Format or Persona -->
+          <div class="section-title">Specify Format or Persona</div>
+          <label for="tcrei_format">
+            Specify the desired format for the output:
+            <span class="tooltip">
+              <i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+              <span class="tooltiptext">
+                • Formatted in Markdown<br>
+                • As a bulleted list<br>
+                • In the style of a formal letter<br>
+                • Written as a Twitter/X thread (6–8 posts)<br>
+                • As a short LinkedIn post (≤150 words)<br>
+                • Written in a humorous, sarcastic tone<br>
+                • Persona: Act as a senior cybersecurity consultant for small businesses<br>
+                • Persona: Act as a medical doctor explaining a condition to a patient<br>
+                • Persona: Act as a project manager providing a status update<br>
+                • Persona: Act as a historian describing ancient Rome<br>
+              </span>
+            </span>
+          </label>
+          <textarea id="tcrei_format" placeholder="e.g., 'formatted in Markdown' or 'as a bulleted list' or 'a formal letter' or 'a social media post' or Persona Prompt: 'Act as a senior cybersecurity consultant specializing in small business risk assessment.'"></textarea>
+
+          <!-- Create (Context) -->
+          <div class="section-title">Create (Context)</div>
+          <label for="tcrei_context">
+            Provide any necessary context for the AI:
+            <span class="tooltip">
+              <i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+              <span class="tooltiptext">
+                • The target audience is non-technical small business owners<br>
+                • The blog post should be around 800 words<br>
+                • Key benefits to highlight: cost savings, scalability, and security<br>
+                • Assume the reader has no prior coding knowledge<br>
+                • Keep the tone professional but approachable<br>
+                • Include 3 examples from real-world case studies<br>
+                • Use UK English spelling instead of US<br>
+                • Audience: middle school students; simplify vocabulary<br>
+                • Provide both pros and cons in the output<br>
+                • Cite at least 2 credible sources when possible<br>
+              </span>
+            </span>
+          </label>
+          <textarea id="tcrei_context" placeholder="e.g., 'The target audience is non-technical small business owners. The blog post should be around 800 words. Key benefits to highlight are cost savings, scalability, and security.'"></textarea>
+
+          <!-- Really (References) -->
+          <div class="section-title">Really (References)</div>
+          <label for="tcrei_references">
+            Include references or examples for the AI to use:
+            <span class="tooltip">
+              <i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+              <span class="tooltiptext">
+                • Use this article for tone/style: [paste text]<br>
+                • Reference URL: https://example.com/marketing-guide<br>
+                • Base response on World Health Organisation guidelines<br>
+                • Follow structure of this sample press release<br>
+                • Adapt the tone to match Apple product descriptions<br>
+                • Cite at least two peer-reviewed studies<br>
+                • Use my CV (provided below) as the reference material<br>
+                • Incorporate statistics from the 2023 UN report<br>
+                • Match the storytelling style of J.K. Rowling<br>
+                • Imitate the humour from Terry Pratchett novels<br>
+              </span>
+            </span>
+          </label>
+          <textarea id="tcrei_references" placeholder="e.g., 'Here are some URLs for reference: https://example.com/cloud-benefits. Also, use a friendly, approachable tone similar to this article: [Paste article text here].'"></textarea>
+
+          <!-- Inputs (Iterate) -->
+          <div class="section-title">Inputs (Iterate)</div>
+          <label for="tcrei_iterate">
+            Suggestions for improving or iterating on the prompt/output:
+            <span class="tooltip">
+              <i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+              <span class="tooltiptext">
+                • Expand the introduction with more storytelling<br>
+                • Make the summary shorter and snappier<br>
+                • Add more concrete examples<br>
+                • Simplify technical jargon<br>
+                • Use more persuasive/marketing language<br>
+                • Provide both advantages and disadvantages<br>
+                • Change the tone to be more humorous<br>
+                • Add a clear call to action at the end<br>
+                • Reformat into bullet points or a table<br>
+                • Rewrite for a 12-year-old audience<br>
+              </span>
+            </span>
+          </label>
+          <textarea id="tcrei_iterate" placeholder="e.g., 'Shorten the response by half' or 'Make it more formal' or 'Add more examples.'"></textarea>
+
+          <div class="checkbox-container">
+            <input type="checkbox" id="tcrei_add_tags">
+            <label for="tcrei_add_tags">Add XML-like tags to output (e.g., &lt;task&gt;)</label>
+          </div>
+          <button type="button" onclick="generatePromptAndSave('tcrei')">Generate TCREI Prompt & Save</button>
+        </div>
+        <div id="designMethod" class="method-section">
+            <h2>DESIGN Method (Image Generation)</h2>
+            <p>Using the DESIGN Method:</p>
+            <ul>
+                <li><strong>D</strong>escription: What is the core subject, action, or primary focus?</li>
+                <li><strong>E</strong>nvironment: Where is the subject located? Describe the setting.</li>
+                <li><strong>S</strong>tyle: What artistic style or visual aesthetic? (e.g., photorealistic, oil painting, anime)</li>
+                <li><strong>I</strong>llumination: How is the scene lit? What time of day?</li>
+                <li><strong>G</strong>radation: What level of quality, detail, and resolution?</li>
+                <li><strong>N</strong>uances: Specific modifiers, camera angles, or elements to avoid (negative prompts).</li>
+            </ul>
+            <strong>Visual References:</strong> Images or styles to draw inspiration from.
+            <div class="section-title">Description (Subject & Action)</div>
+            <label for="design_description">
+            What is the core subject, action, or primary focus of your image?
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+                <span class="tooltiptext">
+                    • A curious cat batting at a butterfly<br>
+                    • Elderly watchmaker repairing a tiny gear<br>
+                    • Astronaut planting a flag on an icy exoplanet<br>
+                    • Chef tossing noodles in a flaming wok<br>
+                    • Samurai drawing a katana beneath cherry blossoms<br>
+                    • Cyberpunk courier weaving through neon traffic<br>
+                    • Viking shieldmaiden raising a torch in a cave<br>
+                    • Falcon launching from a gloved hand<br>
+                    • Surfer carving a glowing bioluminescent wave<br>
+                    • Witch brewing tea in a cozy kitchen<br>
+                    • Archaeologist brushing dust off a golden mask
+                </span>
+            </span>
+            </label>
+            <textarea id="design_description" placeholder="e.g., 'A curious cat batting at a butterfly.'"></textarea>
+
+            <div class="section-title">Environment (Setting & Background)</div>
+            <label for="design_environment">Where is the subject located? Describe the setting, background, or scene:
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+                <span class="tooltiptext">
+                    • In an old, sun-dappled library<br>
+                    • On a rain-slick neon street in a mega-city<br>
+                    • At a windswept cliff over a stormy sea<br>
+                    • In a mossy forest with towering redwoods<br>
+                    • On a bustling night market under paper lanterns<br>
+                    • On a frozen lake beneath aurora borealis<br>
+                    • In a greenhouse filled with mist and ferns<br>
+                    • Inside an abandoned cathedral with cracked murals<br>
+                    • At a seaside pier with gulls and fog horns<br>
+                    • In a cozy bookshop café, rain on the window<br>
+                </span>
+            </span>
+            </label>
+            <textarea id="design_environment" placeholder="e.g., 'In an old, sun-dappled library.'"></textarea>
+
+            <div class="section-title">Style (Artistic & Visual Aesthetic)</div>
+            <label for="design_style">What artistic style or visual aesthetic do you want?
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+            <span class="tooltiptext">
+                • Photorealistic, cinematic still<br>
+                • Fine art oil painting, impasto brushwork<br>
+                • Watercolor illustration, loose washes<br>
+                • Anime keyframe, clean linework<br>
+                • Ghibli-inspired soft fantasy<br>
+                • Noir, high-contrast black & white<br>
+                • Vaporwave, retro-futurist gradients<br>
+                • Ukiyo-e woodblock print aesthetic<br>
+                • Surrealist dreamscape, Magritte vibes<br>
+                • Steampunk Victorian aesthetic<br>
+            </span>
+            </span>
+            </label>
+            <textarea id="design_style" placeholder="e.g., 'Photorealistic, cinematic still.' or 'Oil painting, by Van Gogh.'"></textarea>
+
+            <div class="section-title">Illumination (Lighting & Time)</div>
+            <label for="design_illumination">How is the scene lit? What time of day? 
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+                <span class="tooltiptext">
+                    • Golden hour backlight, long soft shadows<br>
+                    • Blue hour city glow, neon highlights<br>
+                    • Overcast softbox light, diffuse<br>
+                    • Candlelit interior, warm pools of light<br>
+                    • Moonlit night, cool tones<br>
+                    • Volumetric god rays through dusty windows<br>
+                    • Firelight flicker, warm orange<br>
+                    • Studio three-point lighting<br>
+                    • Aurora borealis ambient<br>
+                    • Sunset with pink and amber bounce<br>
+                </span>
+              </span>
+            </label>
+            <textarea id="design_illumination" placeholder="e.g., 'With soft, warm lighting streaming through a stained-glass window.' or 'Golden hour, dramatic studio lighting.'"></textarea>
+
+            <div class="section-title">Gradation (Quality & Detail)</div>
+            <label for="design_gradation">What level of quality, detail, and resolution?
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+                <span class="tooltiptext">
+                    • Intricate details, high resolution<br>
+                    • 8K, masterpiece, sharp focus<br>
+                    • Ultra-real textures, micro-detail<br>
+                    • HDR, wide dynamic range<br>
+                    • Macro-level detail, 1:1 reproduction<br>
+                    • Film grain, subtle, high fidelity<br>
+                    • Ray-traced reflections and shadows<br>
+                    • Print-ready, 300 DPI equivalent<br>
+                    • Subsurface skin scattering<br>
+                    • Artist’s brush texture preserved<br>
+                </span>
+            </span>
+            </label>
+            <textarea id="design_gradation" placeholder="e.g., 'Intricate details, high resolution.' or '8K, masterpiece, sharp focus.'"></textarea>
+
+            <div class="section-title">Nuances (Specific Modifiers & Negative Prompts)</div>
+            <label for="design_nuances">Any specific details, camera angles, or elements to avoid (Negative Prompts)?
+             <span class="tooltip"><i class="fa-solid fa-circle-info fa-spin tooltip-icon"></i>
+                <span class="tooltiptext">
+                    • Low angle hero shot, 24mm lens<br>
+                    • High angle bird’s-eye view<br>
+                    • Over-the-shoulder framing<br>
+                    • Rule of thirds, subject off-center<br>
+                    • Motion blur background, subject sharp<br>
+                    • Foreground framing with leaves<br>
+                    • Negative prompt: blurry, out of focus<br>
+                    • Negative prompt: deformed anatomy<br>
+                    • Negative prompt: watermark, text artifacts<br>
+                    • Negative prompt: oversaturated colors<br>
+                </span>
+            </span>
+            </label>
+            <textarea id="design_nuances" placeholder="e.g., 'From a low angle. Negative prompt: blurry, deformed, cartoonish.'"></textarea>
+
+            <div class="section-title">Visual References / Examples</div>
+            <label for="design_references">Describe specific visual examples or provide URLs (if supported by your AI model):</label>
+            <textarea id="design_references" placeholder="e.g., 'Inspired by the photography of Annie Leibovitz, with the vibrant colors of a Disney animation. Reference image: https://example.com/my-reference-image.jpg'"></textarea>
+
+            <button type="button" onclick="generatePromptAndSave('design')">Generate DESIGN Prompt & Save</button>
+        </div>
+
+        <hr>
+
+        <h2>Current Session Prompts</h2>
+        <div id="sessionPromptHistoryContainer">
+            <p class="no-prompts-message">Prompts generated in this session will appear here. They are saved to the database but will clear from here on refresh.</p>
+        </div>
+
+        <hr>
+
+        <h2>Search & Manage Saved Prompts</h2>
+        <div class="search-controls">
+            <div>
+                <label for="searchPromptType">Filter by Type:</label>
+                <select id="searchPromptType">
+                    <option value="All">All Types</option>
+                    <option value="tcrei">TCREI</option>
+                    <option value="design">DESIGN</option>
+                </select>
+            </div>
+            <div>
+                <label for="searchKeyword">Search Keyword:</label>
+                <input type="text" id="searchKeyword" placeholder="Search by title or content...">
+            </div>
+            <button type="button" onclick="searchPrompts(1, true)">Search Prompts</button>
+            <button type="button" onclick="listAllPrompts()">List All Prompts</button>
+        </div>
+
+        <div id="searchResultsContainer">
+            <p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>
+        </div>
+
+        <div class="pagination-controls">
+            <button id="prevPageBtn" onclick="changePage(-1)" disabled>Previous</button>
+            <span id="currentPageSpan">Page 1 of 1</span>
+            <button id="nextPageBtn" onclick="changePage(1)" disabled>Next</button>
+        </div>
+
+        <button id="clearAllDbPrompts" class="clear-all-db-prompts" type="button" style="display: none;">Clear ALL Saved Prompts (from Database)</button>
+
+    </div>
+
+    <script>
+        // Global variables for managing state
+        let sessionPromptCounter = 0; // For unique IDs within the current session's display
+        let lastRestoredPromptData = null; // Stores the prompt_data object of the last loaded prompt for comparison
+        let currentSearchPage = 1; // Current page for search results
+        let totalPages = 1; // Total pages for pagination
+        const promptsPerPage = 10; // Number of prompts to display per page in search results
+
+        // --- Utility Functions ---
+        function showAlert(message, type = 'success') {
+            const banner = document.getElementById('alert-banner');
+            const messageSpan = document.getElementById('alert-message');
+
+            banner.className = 'alert'; // Reset classes
+            banner.classList.add(type); // Add the appropriate class for color
+            messageSpan.innerHTML = message;
+            banner.style.display = 'block';
+
+            banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => {
+                banner.style.display = 'none'; // Hide alert after 5 seconds
+            }, 5000);
+        }
+
+        function normalizeInput(text) {
+            // Trim whitespace and replace multiple newlines with single newline
+            return text.trim().replace(/\n{2,}/g, '\n');
+        }
+
+        function showMethodFields() {
+            const selector = document.getElementById('methodSelector');
+            const tcreiSection = document.getElementById('tcreiMethod');
+            const designSection = document.getElementById('designMethod');
+
+            // Hide all and then show the active one
+            tcreiSection.classList.remove('active');
+            designSection.classList.remove('active');
+
+            if (selector.value === 'tcrei') {
+                tcreiSection.classList.add('active');
+            } else if (selector.value === 'design') {
+                designSection.classList.add('active');
+            }
+        }
+
+        function clearFormFields() {
+            const allTextareas = document.querySelectorAll('textarea');
+            allTextareas.forEach(textarea => {
+                textarea.value = '';
+            });
+            document.getElementById('tcrei_add_tags').checked = false; // Uncheck checkbox
+            lastRestoredPromptData = null; // Important: reset state after clearing form
+        }
+
+        // --- Robust Deep Object Comparison Function ---
+        function deepEqual(obj1, obj2) {
+            // Strict equality for primitives
+            if (obj1 === obj2) return true;
+
+            // Check for null or non-object types
+            if (obj1 == null || typeof obj1 != 'object' ||
+                obj2 == null || typeof obj2 != 'object') {
+                return false;
+            }
+
+            // Check if both are arrays
+            if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
+            if (Array.isArray(obj1)) {
+                if (obj1.length !== obj2.length) return false;
+                for (let i = 0; i < obj1.length; i++) {
+                    if (!deepEqual(obj1[i], obj2[i])) return false;
+                }
+                return true;
+            }
+
+            // Get keys for object comparison
+            const keys1 = Object.keys(obj1);
+            const keys2 = Object.keys(obj2);
+
+            // Check if objects have the same number of properties
+            if (keys1.length !== keys2.length) return false;
+
+            // Check if all properties in obj1 are in obj2 and deepEqual
+            for (const key of keys1) {
+                if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // --- Main Prompt Generation & Save Logic ---
+        async function generatePromptAndSave(method) {
+            let combinedPrompt = '';
+            let promptData = { method: method }; // Object to store all individual input fields
+
+            // 1. Gather data and construct the combined prompt string based on method
+            if (method === 'tcrei') {
+                const task = normalizeInput(document.getElementById('tcrei_task').value);
+                const format = normalizeInput(document.getElementById('tcrei_format').value);
+                const context = normalizeInput(document.getElementById('tcrei_context').value);
+                const references = normalizeInput(document.getElementById('tcrei_references').value);
+                const iterate = normalizeInput(document.getElementById('tcrei_iterate')?.value || '');
+                const addTags = document.getElementById('tcrei_add_tags').checked;
+
+                // Store all individual fields in promptData for later restoration
+                promptData.task = task;
+                promptData.format = format;
+                promptData.context = context;
+                promptData.references = references;
+                promptData.iterate = iterate;          // <-- NEW
+                promptData.addTags = addTags;
+
+                if (!task && !format && !context && !references && !iterate) {
+                    showAlert("Please fill in at least one TCREI field to generate a prompt.", 'warning');
+                    return;
+                }
+
+                if (addTags) {
+                    // XML-like tagged output
+                    const taggedBlocks = [];
+                    if (task)       taggedBlocks.push(`<task>${task}</task>`);
+                    if (format)     taggedBlocks.push(`<format>${format}</format>`);
+                    if (context)    taggedBlocks.push(`<context>${context}</context>`);
+                    if (references) taggedBlocks.push(`<references>${references}</references>`);
+                    if (iterate)    taggedBlocks.push(`<revise>${iterate}</revise>`); // <-- NEW (iterate)
+                    combinedPrompt = taggedBlocks.join('\n');
+                } else {
+                    // Plain text output
+                    const blocks = [];
+                    if (task)       blocks.push(task);
+                    if (format)     blocks.push(format);
+                    if (context)    blocks.push(context);
+                    if (references) blocks.push(references);
+                    if (iterate)    blocks.push(`\nRevise with:\n${iterate}`); // <-- NEW (iterate)
+                    combinedPrompt = blocks.join(' ');
+                }
+            } else if (method === 'design') {
+                const description = normalizeInput(document.getElementById('design_description').value);
+                const environment = normalizeInput(document.getElementById('design_environment').value);
+                const style = normalizeInput(document.getElementById('design_style').value);
+                const illumination = normalizeInput(document.getElementById('design_illumination').value);
+                const gradation = normalizeInput(document.getElementById('design_gradation').value);
+                const nuances = normalizeInput(document.getElementById('design_nuances').value);
+                const references = normalizeInput(document.getElementById('design_references').value);
+
+                // Store all individual fields in promptData for later restoration
+                promptData.description = description;
+                promptData.environment = environment;
+                promptData.style = style;
+                promptData.illumination = illumination;
+                promptData.gradation = gradation;
+                promptData.nuances = nuances;
+                promptData.references = references;
+
+                const designElements = [];
+                if (description) designElements.push(description);
+                if (environment) designElements.push(environment);
+                if (style) designElements.push(style);
+                if (illumination) designElements.push(illumination);
+                if (gradation) designElements.push(gradation);
+                if (nuances) designElements.push(nuances);
+                if (references) designElements.push(references);
+
+                if (designElements.length === 0) {
+                    showAlert("Please fill in at least one DESIGN field to generate a prompt.", 'warning');
+                    return;
+                }
+
+                combinedPrompt = designElements.join(' ');
+            }
+
+            if (combinedPrompt) {
+                let saveToDB = true; // Flag to determine if we save to DB
+                let sessionPromptTitle = ''; // Title for the session history entry
+                let isNewDbEntry = true; // Flag to know if it's a new DB entry or just a session view
+
+                // If a prompt was previously restored, check for changes
+                if (lastRestoredPromptData) {
+                    if (deepEqual(promptData, lastRestoredPromptData)) {
+                        showAlert("No changes detected. Prompt not saved as a new copy.", 'info');
+                        saveToDB = false; // Prevent saving to DB if no changes
+                        isNewDbEntry = false; // It's not a new DB entry
+                        sessionPromptTitle = `Loaded Prompt (No Changes) ${++sessionPromptCounter}`;
+                    }
+                }
+
+                // If changes were detected or no prompt was loaded, then save to DB
+                if (saveToDB) {
+                    const date = new Date();
+                    const dbSaveTitle = `${method.toUpperCase()} Prompt - ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+                    const savedPrompt = await savePromptToDB(dbSaveTitle, combinedPrompt, promptData);
+
+                    if (savedPrompt) {
+                        sessionPromptTitle = `${method.toUpperCase()} Session Prompt ${++sessionPromptCounter} - ${date.toLocaleTimeString()}`;
+                        // Add to current session history display using DB ID
+                        addPromptToAccordion(sessionPromptTitle, combinedPrompt, promptData, savedPrompt.id, '#sessionPromptHistoryContainer');
+                        document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
+                    } else {
+                        // If DB save failed, don't add to session history either
+                        sessionPromptTitle = ''; // Prevent adding to session history if DB save failed
+                    }
+                }
+
+                // Add to current session history if it's not a new DB entry that was already added
+                // This logic ensures it's added to session history for both brand new saves and "no changes"
+                if (sessionPromptTitle && !isNewDbEntry) { // Add to session history if it's a "no changes" case
+                     addPromptToAccordion(sessionPromptTitle, combinedPrompt, promptData, 'session-' + sessionPromptCounter, '#sessionPromptHistoryContainer');
+                     document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
+                }
+
+                // Always clear fields and reset restored state after attempted generation/save
+                clearFormFields();
+            }
+        }
+
+        // --- Database Interaction Functions (AJAX via Fetch API) ---
+        async function savePromptToDB(title, generatedPrompt, promptData) {
+            try {
+                const response = await fetch('php/save_prompt.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: promptData.method,
+                        title: title,
+                        generated_prompt: generatedPrompt,
+                        prompt_data: promptData
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Failed to save prompt: HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                showAlert(result.message, 'success');
+                return result.prompt; // Returns the full prompt object with its new ID from the DB
+            } catch (error) {
+                console.error('Error saving prompt:', error);
+                showAlert(`Error saving prompt: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function deletePrompt(id) {
+            if (!confirm(`Are you sure you want to delete this prompt from the database? This action cannot be undone.`)) {
+                return; // User cancelled
+            }
+            try {
+                const response = await fetch('php/delete_prompt.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id: id })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Failed to delete prompt: HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                showAlert(result.message, 'success');
+                searchPrompts(currentSearchPage);
+            } catch (error) {
+                console.error('Error deleting prompt:', error);
+                showAlert(`Error deleting prompt: ${error.message}`, 'error');
+            }
+        }
+
+        // --- Modified searchPrompts function ---
+        async function searchPrompts(page = 1, isSearchButtonClicked = false) { // Added isSearchButtonClicked parameter
+            const searchType = document.getElementById('searchPromptType').value;
+            const searchKeyword = document.getElementById('searchKeyword').value;
+            currentSearchPage = page;
+
+            // --- Corrected Search Validation Logic ---
+            // Only validate if it was an explicit "Search Prompts" click AND criteria are empty
+            if (isSearchButtonClicked && searchKeyword.trim() === '' && searchType === 'All') {
+                showAlert("Please enter a search keyword or select a specific prompt type.", 'warning');
+                document.getElementById('searchResultsContainer').innerHTML = '<p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>';
+                document.getElementById('clearAllDbPrompts').style.display = 'none';
+                updatePaginationControls(0, 0); // Reset pagination controls
+                return; // Stop function execution
+            }
+
+            const searchResultsContainer = document.getElementById('searchResultsContainer');
+            searchResultsContainer.innerHTML = '<p class="no-prompts-message">Searching...</p>';
+            document.getElementById('clearAllDbPrompts').style.display = 'none';
+
+            let queryParams = new URLSearchParams({
+                page: currentSearchPage,
+                limit: promptsPerPage
+            });
+            if (searchType !== 'All') {
+                queryParams.append('type', searchType);
+            }
+            if (searchKeyword.trim() !== '') {
+                queryParams.append('keyword', searchKeyword.trim());
+            }
+
+            try {
+                const response = await fetch(`php/search_prompts.php?${queryParams.toString()}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch search results');
+                }
+                const result = await response.json();
+
+                searchResultsContainer.innerHTML = '';
+
+                if (result.prompts.length === 0) {
+                    searchResultsContainer.innerHTML = '<p class="no-prompts-message">No matching prompts found.</p>';
+                } else {
+                    result.prompts.forEach(prompt => {
+                        addPromptToAccordion(prompt.title, prompt.generated_prompt, prompt.prompt_data, prompt.id, '#searchResultsContainer');
+                    });
+                    document.getElementById('clearAllDbPrompts').style.display = 'block';
+                }
+
+                totalPages = result.total_pages;
+                updatePaginationControls();
+            } catch (error) {
+                console.error('Error searching prompts:', error);
+                searchResultsContainer.innerHTML = '<p class="no-prompts-message" style="color:red;">Error searching prompts. Please check the server connection and PHP scripts.</p>';
+                showAlert(`Error searching prompts: ${error.message}`, 'error');
+                updatePaginationControls(0, 0);
+            }
+        }
+
+        // --- Remaining functions (restorePrompt, addPromptToAccordion, copyToClipboard, listAllPrompts, changePage, updatePaginationControls, clearAllDbPrompts, DOMContentLoaded) ---
+
+        function restorePrompt(promptData) {
+            clearFormFields();
+            lastRestoredPromptData = promptData;
+
+            const method = promptData.method;
+            document.getElementById('methodSelector').value = method;
+            showMethodFields();
+
+            if (method === 'tcrei') {
+                document.getElementById('tcrei_task').value = promptData.task || '';
+                document.getElementById('tcrei_format').value = promptData.format || '';
+                document.getElementById('tcrei_context').value = promptData.context || '';
+                document.getElementById('tcrei_references').value = promptData.references || '';
+                document.getElementById('tcrei_add_tags').checked = promptData.addTags || false;
+            } else if (method === 'design') {
+                document.getElementById('design_description').value = promptData.description || '';
+                document.getElementById('design_environment').value = promptData.environment || '';
+                document.getElementById('design_style').value = promptData.style || '';
+                document.getElementById('design_illumination').value = promptData.illumination || '';
+                document.getElementById('design_gradation').value = promptData.gradation || '';
+                document.getElementById('design_nuances').value = promptData.nuances || '';
+                document.getElementById('design_references').value = promptData.references || '';
+            }
+            showAlert('Prompt content has been loaded into the form fields for editing.', 'success');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function addPromptToAccordion(title, promptText, promptData, uniqueId, targetContainerSelector) {
+            const historyContainer = document.querySelector(targetContainerSelector);
+
+            const accordionItem = document.createElement('div');
+            accordionItem.classList.add('accordion-item');
+            accordionItem.dataset.prompt = JSON.stringify(promptData);
+            accordionItem.dataset.uniqueId = uniqueId;
+
+            const accordionButton = document.createElement('button');
+            accordionButton.classList.add('accordion-button');
+            accordionButton.textContent = title;
+            accordionButton.onclick = function() {
+                this.classList.toggle('active');
+                const panel = this.nextElementSibling;
+                if (panel.classList.contains('active')) {
+                    panel.classList.remove('active');
+                    panel.style.maxHeight = null;
+                } else {
+                    panel.classList.add('active');
+                    panel.style.maxHeight = (panel.scrollHeight + 80) + "px";
+                }
+            };
+
+            const accordionPanel = document.createElement('div');
+            accordionPanel.classList.add('accordion-panel');
+
+            const preElement = document.createElement('pre');
+            preElement.textContent = promptText;
+
+            const buttonGroup = document.createElement('div');
+            buttonGroup.classList.add('button-group');
+
+            const copyButton = document.createElement('button');
+            copyButton.classList.add('copy-button');
+            copyButton.textContent = 'Copy';
+            copyButton.onclick = (event) => {
+                event.stopPropagation();
+                copyToClipboard(promptText, copyButton);
+            };
+
+            const restoreButton = document.createElement('button');
+            restoreButton.textContent = 'Load for Editing';
+            restoreButton.classList.add('load-button');
+            restoreButton.onclick = (event) => {
+                event.stopPropagation();
+                restorePrompt(promptData);
+            };
+
+            buttonGroup.appendChild(copyButton);
+            buttonGroup.appendChild(restoreButton);
+
+            if (targetContainerSelector === '#searchResultsContainer') {
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.classList.add('delete-button');
+                deleteButton.onclick = (event) => {
+                    event.stopPropagation();
+                    deletePrompt(uniqueId);
+                };
+                buttonGroup.appendChild(deleteButton);
+            }
+
+            accordionPanel.appendChild(preElement);
+            accordionPanel.appendChild(buttonGroup);
+            accordionItem.appendChild(accordionButton);
+            accordionItem.appendChild(accordionPanel);
+
+            historyContainer.prepend(accordionItem);
+
+            if (targetContainerSelector === '#sessionPromptHistoryContainer') {
+                accordionButton.click();
+                accordionItem.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }
+
+        function copyToClipboard(textToCopy, buttonElement) {
+            if (!textToCopy) {
+                showAlert('No prompt generated yet to copy.', 'warning');
+                return;
+            }
+
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = textToCopy;
+            tempTextArea.style.position = 'absolute';
+            tempTextArea.style.left = '-9999px';
+            tempTextArea.style.top = '-9999px';
+            document.body.appendChild(tempTextArea);
+
+            const originalText = buttonElement.textContent;
+
+            try {
+                tempTextArea.select();
+                document.execCommand('copy');
+                buttonElement.textContent = 'Copied!';
+                setTimeout(() => {
+                    buttonElement.textContent = originalText;
+                }, 2000);
+                showAlert('Prompt copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                showAlert('Failed to copy the prompt. Please copy it manually.', 'error');
+            } finally {
+                document.body.removeChild(tempTextArea);
+            }
+        }
+
+        function listAllPrompts() {
+            document.getElementById('searchPromptType').value = 'All';
+            document.getElementById('searchKeyword').value = '';
+            searchPrompts(1, false); // Pass 'false' to bypass the new validation
+        }
+
+        function changePage(delta) {
+            const newPage = currentSearchPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                searchPrompts(newPage, true); // Pagination triggered from search implies validation (safe default)
+            }
+        }
+
+        function updatePaginationControls(current = currentSearchPage, total = totalPages) {
+            document.getElementById('currentPageSpan').textContent = `Page ${current} of ${total}`;
+            document.getElementById('prevPageBtn').disabled = (current === 1);
+            document.getElementById('nextPageBtn').disabled = (current === total || total === 0);
+        }
+
+        document.getElementById('clearAllDbPrompts').onclick = async function() {
+            if (confirm("Are you sure you want to clear ALL saved prompts from the database? This action cannot be undone.")) {
+                try {
+                    const response = await fetch('php/clear_all_prompts.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to clear prompts');
+                    }
+
+                    const result = await response.json();
+                    showAlert(result.message, 'success');
+                    listAllPrompts();
+                } catch (error) {
+                    console.error('Error clearing all database prompts:', error);
+                    showAlert(`Error clearing all database prompts: ${error.message}`, 'error');
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            showMethodFields();
+            document.getElementById('searchResultsContainer').innerHTML = '<p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>';
+            document.getElementById('clearAllDbPrompts').style.display = 'none';
+            updatePaginationControls();
+        });
+    </script>
+</body>
+</html>
