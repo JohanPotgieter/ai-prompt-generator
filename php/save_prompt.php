@@ -59,7 +59,7 @@ $generated_prompt= (string)$data['generated_prompt'];
 $prompt_data_arr = $data['prompt_data'];
 
 // Constrain allowed types (extend as needed)
-$allowedTypes = ['tcrei', 'design'];
+$allowedTypes = ['tcrei', 'design', 'agent'];
 if ($type === '' || !in_array($type, $allowedTypes, true)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid "type". Allowed: ' . implode(', ', $allowedTypes)]);

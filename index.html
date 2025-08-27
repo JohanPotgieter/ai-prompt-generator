@@ -108,6 +108,7 @@
     <select id="methodSelector" onchange="showMethodFields()">
       <option value="tcrei">TCREI Method (Text Generation)</option>
       <option value="design">DESIGN Method (Image Generation)</option>
+       <option value="agent">Agent Mode (Research & Implement)</option>
     </select>
 
     <hr>
@@ -491,6 +492,41 @@
 
           <button type="button" onclick="generatePromptAndSave('design')">Generate DESIGN Prompt & Save</button>
         </div>
+        <!-- AGENT (Research & Implement) -->
+        <div id="agentMethod" class="method-section">
+          <h2>Agent Mode (Research & Implement)</h2>
+          <p>Build a browsable, source-cited, implementation-oriented prompt for an autonomous agent.</p>
+
+          <div class="section-title">Objective</div>
+          <label for="agent_objective">What do you want achieved?</label>
+          <textarea id="agent_objective" placeholder="e.g., Implement membership renewal resend link in Woo admin..."></textarea>
+
+          <div class="section-title">Success Criteria</div>
+          <label for="agent_success">How will we measure success?</label>
+          <textarea id="agent_success" placeholder="e.g., Link appears under 'Next Bill On', sends correct email template, logs action..."></textarea>
+
+          <div class="section-title">Scope / Out of Scope</div>
+          <label for="agent_scope">In scope (bullet list)</label>
+          <textarea id="agent_scope" placeholder="- Add admin link\n- Trigger existing email template\n- Include nonce + capability checks"></textarea>
+
+          <label for="agent_outofscope">Out of scope (bullet list)</label>
+          <textarea id="agent_outofscope" placeholder="- New email templates\n- DB schema changes"></textarea>
+
+          <div class="section-title">Constraints</div>
+          <label for="agent_constraints">Perf, security, compliance, time/budget</label>
+          <textarea id="agent_constraints" placeholder="- Follow WP nonces/escapes\n- No raw SQL without $wpdb->prepare\n- AEST logs only"></textarea>
+
+          <div class="section-title">Environment Details</div>
+          <label for="agent_env">Versions, plugin names, paths</label>
+          <textarea id="agent_env" placeholder="PHP 8+, WP + Woo, Local by Flywheel (Win11), prod on Flywheel (NGINX). Plugin: /wp-content/plugins/oi-mods/ (single repo). TZ: Australia/Brisbane (AEST; no DST)."></textarea>
+
+          <div class="section-title">Extra Vendor Docs (optional)</div>
+          <label for="agent_extra_sources">Add domain-specific docs to prioritize</label>
+          <textarea id="agent_extra_sources" placeholder="- Formidable Forms developer docs\n- Woo Memberships docs"></textarea>
+
+          <button type="button" onclick="generatePromptAndSave('agent')">Generate Agent Prompt & Save</button>
+        </div>
+
       </div>
 
       <!-- Side panel -->
@@ -537,6 +573,7 @@
           <option value="All">All Types</option>
           <option value="tcrei">TCREI</option>
           <option value="design">DESIGN</option>
+           <option value="agent">AGENT</option>
         </select>
       </div>
 
@@ -599,49 +636,135 @@
 
     function showAlert(message,type='success'){const b=document.getElementById('alert-banner');const m=document.getElementById('alert-message');b.className='alert';b.classList.add(type);m.innerHTML=message;b.style.display='block';b.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{b.style.display='none';},5000);}
     function normalizeInput(text){return (text||'').trim().replace(/\n{2,}/g,'\n');}
-    function showMethodFields(){const s=document.getElementById('methodSelector');const t=document.getElementById('tcreiMethod');const d=document.getElementById('designMethod');t.classList.remove('active');d.classList.remove('active');(s.value==='tcrei'?t:d).classList.add('active');renderPreview();}
+    function buildAgentObj() {
+      if (document.getElementById('methodSelector').value !== 'agent') return { text: '' };
+
+      const objective    = normalizeInput(document.getElementById('agent_objective').value);
+      const success      = normalizeInput(document.getElementById('agent_success').value);
+      const scope        = normalizeInput(document.getElementById('agent_scope').value);
+      const outofscope   = normalizeInput(document.getElementById('agent_outofscope').value);
+      const constraints  = normalizeInput(document.getElementById('agent_constraints').value);
+      const env          = normalizeInput(document.getElementById('agent_env').value);
+      const extraVendors = normalizeInput(document.getElementById('agent_extra_sources').value);
+
+      // Source Priority block (append extra vendors if provided)
+      const extraLine = extraVendors ? `\n6) ${extraVendors}\n` : '\n6) {{domain-specific vendor docs}}\n';
+      const SOURCE_PRIORITY = 
+    `SOURCE PRIORITY (examples to start with)
+    1) WordPress Developer Resources & Plugin Handbook
+    2) WooCommerce Docs & Developer Docs
+    3) PHP Manual; MySQL Docs; MDN for front-end
+    4) Flywheel Help/Docs (hosting specifics)
+    5) OpenAI official docs when relevant${extraLine}(Avoid Wikipedia unless no primary sources exist.)`;
+
+      const CONTEXT = 
+    `CONTEXT
+    - Stack: WordPress (custom plugin single-repo), WooCommerce, PHP 8+, MySQL, jQuery/Bootstrap. Local dev via Local by Flywheel (Windows 11); prod on Flywheel (NGINX); timezone: Australia/Brisbane (AEST; no DST).
+    - Preferences: runnable code + clear placement instructions + concise reasoning bullets; prefer primary sources. Avoid Wikipedia unless no primary source is available.`;
+
+      const TASK =
+    `TASK
+    - Objective: ${objective || '{{what to achieve}}'}
+    - Success criteria: ${success || '{{measurable outcomes}}'}
+    - Scope / Out of scope: ${(scope||'').trim() || '{{lists}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscope}` : ''}
+    - Constraints: ${constraints || '{{perf, security, compliance, time, budget}}'}
+    - Environment details: ${env || '{{versions, plugin names, relevant paths}}'}`;
+
+      const TOOLS_ACTIONS =
+    `TOOLS & ACTIONS
+    - You may browse the web, read/place files, and create artifacts. For high-impact changes (security, data loss risk), PAUSE and request confirmation before acting.
+    - Prefer these source types, in order: vendor/official docs; standards bodies; original blog posts/release notes; well-established community docs. Provide inline citations and a short **Sources** section.`;
+
+      const WORKFLOW =
+    `WORKFLOW
+    1) Clarify assumptions (≤5 bullets). Then outline a short plan (steps).
+    2) Execute research with citations; compare at least 2 primary sources when applicable.
+    3) Deliver artifacts:
+      - Code (ready to paste) with exact file path and hooks/filters used
+      - Any commands (WP-CLI, SQL, cURL) needed
+      - Minimal test plan + rollback instructions
+      - Changelog of files touched
+    4) If blocked, present 2–3 options with trade-offs and your recommendation.
+    5) Stop if credentials are required or an irreversible action is detected—ask for approval.`;
+
+      const OUTPUT_QUALITY =
+    `OUTPUT FORMAT
+    - **Assumptions**
+    - **Plan** (bullet list)
+    - **Implementation** (code + where to place it)
+    - **Tests** (how to verify)
+    - **Rollback** (how to undo)
+    - **Sources** (3–7 links, official docs first)
+
+    QUALITY BARS
+    - Security: sanitize/escape/nonce in WordPress; least privilege; avoid secrets in code.
+    - Performance: O(n) where feasible; cache/indices when needed.
+    - Accessibility: semantic HTML; color contrast; ARIA when relevant.
+    - Observability: add concise logs around risky areas.
+
+    CONFIRMATION BREAKPOINTS
+    - Any DB schema change, htaccess/NGINX update, auth/session changes, or writes outside plugin directory.`;
+
+      const header = 
+    `ROLE & GOAL
+    You are an autonomous engineering/research agent assisting Joe (casual tone). Your goal is to produce working, documented outputs and cite trustworthy sources.`;
+
+      const text = [
+        header,
+        CONTEXT,
+        TASK,
+        TOOLS_ACTIONS,
+        SOURCE_PRIORITY,
+        WORKFLOW,
+        OUTPUT_QUALITY
+      ].join('\n\n');
+
+      return {
+        text,
+        objective, success, scope, outofscope, constraints, env, extraVendors
+      };
+    }
+
+    // ---- AGENT linter ----
+    function lintAgent(obj) {
+      const issues = [];
+      if (!obj.objective?.trim())     issues.push('No objective.');
+      if (!obj.success?.trim())       issues.push('No success criteria.');
+      if (!obj.scope?.trim() && !obj.outofscope?.trim()) issues.push('No scope / out-of-scope.');
+      if (!obj.env?.trim())           issues.push('No environment details.');
+      if (/\b(nice|cool|good|things|stuff)\b/i.test(obj.text)) issues.push('Ambiguous wording detected — be precise.');
+      return issues;
+    }
     function clearFormFields(){document.querySelectorAll('textarea').forEach(t=>t.value='');document.getElementById('tcrei_add_tags').checked=false;lastRestoredPromptData=null;renderPreview();}
 
     function deepEqual(a,b){if(a===b)return true;if(a==null||typeof a!='object'||b==null||typeof b!='object')return false;const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;for(const k of ka){if(!kb.includes(k)||!deepEqual(a[k],b[k]))return false}return true}
 
     async function generatePromptAndSave(method){
-      let combinedPrompt='';let promptData={method};
-      if(method==='tcrei'){
-        const task=normalizeInput(document.getElementById('tcrei_task').value);
-        const format=normalizeInput(document.getElementById('tcrei_format').value);
-        const context=normalizeInput(document.getElementById('tcrei_context').value);
-        const references=normalizeInput(document.getElementById('tcrei_references').value);
-        let iterate=normalizeInput(document.getElementById('tcrei_iterate').value||'');
-        const addTags=document.getElementById('tcrei_add_tags').checked;
-        if(iterate){iterate=`Before finalising, critique your own draft against these criteria, then revise:\n${iterate}`;}
-        Object.assign(promptData,{task,format,context,references,iterate,addTags});
-        if(!task&&!format&&!context&&!references&&!iterate){showAlert('Please fill in at least one TCREI field to generate a prompt.','warning');return;}
-        if(addTags){
-          const blocks=[]; if(task)blocks.push(`<task>${task}</task>`); if(format)blocks.push(`<format>${format}</format>`); if(context)blocks.push(`<context>${context}</context>`); if(references)blocks.push(`<references>${references}</references>`); if(iterate)blocks.push(`<revise>${iterate}</revise>`);
-          combinedPrompt=blocks.join('\n');
-        }else{
-          const parts=[]; if(task)parts.push(task); if(format)parts.push(format); if(context)parts.push(context); if(references)parts.push(references); if(iterate)parts.push(`Revise with:\n${iterate}`);
-          combinedPrompt=parts.join(' ');
-        }
-      } else if(method==='design'){
-        const description=normalizeInput(document.getElementById('design_description').value);
-        const environment=normalizeInput(document.getElementById('design_environment').value);
-        const style=normalizeInput(document.getElementById('design_style').value);
-        const illumination=normalizeInput(document.getElementById('design_illumination').value);
-        const gradation=normalizeInput(document.getElementById('design_gradation').value);
-        const nuances=normalizeInput(document.getElementById('design_nuances').value);
-        const references=normalizeInput(document.getElementById('design_references').value);
-        Object.assign(promptData,{description,environment,style,illumination,gradation,nuances,references});
-        const arr=[description,environment,style,illumination,gradation,nuances,references].filter(Boolean);
-        if(!arr.length){showAlert('Please fill in at least one DESIGN field to generate a prompt.','warning');return;}
-        combinedPrompt=arr.join(' ');
+      let combinedPrompt=''; let promptData={method};
+      if(method==='tcrei'){ /* existing TCREI block stays as-is */ }
+      else if(method==='design'){ /* existing DESIGN block stays as-is */ }
+      else if(method==='agent'){
+        // Collect + build
+        const obj = buildAgentObj();
+        // basic guard: require at least objective
+        if (!obj.objective?.trim()) { showAlert('Please add an Objective for Agent Mode.','warning'); return; }
+        combinedPrompt = obj.text;
+        Object.assign(promptData, {
+          objective: obj.objective,
+          success: obj.success,
+          scope: obj.scope,
+          outofscope: obj.outofscope,
+          constraints: obj.constraints,
+          env: obj.env,
+          extraVendors: obj.extraVendors
+        });
       }
 
       if(combinedPrompt){
-        let saveToDB=true,sessionPromptTitle='',isNew=true;
+        let saveToDB=true, sessionPromptTitle='', isNew=true;
         if(lastRestoredPromptData && deepEqual(promptData,lastRestoredPromptData)){
           showAlert('No changes detected. Prompt not saved as a new copy.','info');
-          saveToDB=false;isNew=false;sessionPromptTitle=`Loaded Prompt (No Changes) ${++sessionPromptCounter}`;
+          saveToDB=false; isNew=false; sessionPromptTitle=`Loaded Prompt (No Changes) ${++sessionPromptCounter}`;
         }
         if(saveToDB){
           const date=new Date();
@@ -658,8 +781,6 @@
           document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
         }
         renderPreview();
-        // comment the next line if you prefer to keep form values after save:
-        // clearFormFields();
       }
     }
 
@@ -755,7 +876,6 @@
       }
     }
 
-
     function restorePrompt(data){
       clearFormFields(); lastRestoredPromptData=data;
       const method=data.method; document.getElementById('methodSelector').value=method; showMethodFields();
@@ -777,7 +897,23 @@
       }
       renderPreview(); showAlert('Prompt loaded for editing.','success'); window.scrollTo({top:0,behavior:'smooth'});
     }
+    function showMethodFields() {
+        const method = document.getElementById('methodSelector')?.value || 'tcrei';
+        const map = {
+          tcrei:  'tcreiMethod',
+          design: 'designMethod',
+          agent:  'agentMethod' // safe even if you haven't added Agent yet
+        };
 
+        ['tcreiMethod','designMethod','agentMethod'].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.classList.toggle('active', id === map[method]);
+        });
+
+        // Your existing preview function already exists; call it
+        if (typeof renderPreview === 'function') renderPreview();
+      }
     function addPromptToAccordion(title,text,data,id,containerSel){
       const container=document.querySelector(containerSel);
       const item=document.createElement('div'); item.classList.add('accordion-item'); item.dataset.prompt=JSON.stringify(data); item.dataset.uniqueId=id;
@@ -886,45 +1022,46 @@
         return {addTags:false,text:parts.join(' '),task,format,context,references,iterate};
       }
     }
-function renderPreview() {
-  const live = document.getElementById('livePreview');
-  const lint = document.getElementById('linter');
-  const len  = document.getElementById('lengthInfo');
-  const method = document.getElementById('methodSelector').value;
-  const panelTitleEls = document.querySelectorAll('.side-panel h3');
-  if (panelTitleEls[0]) {
-    panelTitleEls[0].textContent = method === 'design' ? 'Final Prompt Preview (DESIGN)' : 'Final Prompt Preview (TCREI)';
+ function renderPreview() {
+    const live = document.getElementById('livePreview');
+    const lint = document.getElementById('linter');
+    const len  = document.getElementById('lengthInfo');
+    const method = document.getElementById('methodSelector').value;
+
+    const h3s = document.querySelectorAll('.side-panel h3');
+    if (h3s[0]) {
+      h3s[0].textContent =
+        method === 'design' ? 'Final Prompt Preview (DESIGN)' :
+        method === 'agent'  ? 'Final Prompt Preview (AGENT)'  :
+                              'Final Prompt Preview (TCREI)';
+    }
+
+    let obj = { text: '' }, issues = [];
+    if (method === 'tcrei') {
+      obj = buildPromptObj();
+      issues = lintPrompt(obj);
+    } else if (method === 'design') {
+      obj = buildDesignObj();
+      issues = lintDesign(obj);
+    } else if (method === 'agent') {
+      obj = buildAgentObj();
+      issues = lintAgent(obj);
+    }
+
+    live.textContent = obj.text || (method === 'design'
+      ? 'Start typing to see a live preview for DESIGN…'
+      : method === 'agent'
+        ? 'Start typing to see a live preview for AGENT…'
+        : 'Start typing to see a live preview for TCREI…');
+
+    lint.innerHTML = issues.length ? ('⚠️ ' + issues.join('<br>')) : '✔️ Looks good';
+
+    const tokens = estimateTokens(obj.text);
+    const chars  = obj.text.length;
+    const words  = obj.text.trim() ? obj.text.trim().split(/\s+/).length : 0;
+    const warn   = tokens > 3500 ? ' — near/over typical 4K limit' : '';
+    len.innerHTML = `Chars: ${chars} • Words: ${words} • Est. tokens: ${tokens}${warn}`;
   }
-  // Choose the right builder + linter
-  let obj, issues;
-  if (method === 'tcrei') {
-    obj = buildPromptObj();
-    issues = lintPrompt(obj);
-  } else if (method === 'design') {
-    obj = buildDesignObj();
-    issues = lintDesign(obj);
-  } else {
-    obj = { text: '' };
-    issues = [];
-  }
-
-  // Live preview
-  live.textContent = obj.text || (method === 'design'
-    ? 'Start typing to see a live preview for DESIGN…'
-    : 'Start typing to see a live preview for TCREI…');
-
-  // Linter UI
-  lint.innerHTML = issues.length ? ('⚠️ ' + issues.join('<br>')) : '✔️ Looks good';
-
-  // Length / token estimate
-  const tokens = estimateTokens(obj.text);
-  const chars  = obj.text.length;
-  const words  = obj.text.trim() ? obj.text.trim().split(/\s+/).length : 0;
-
-  // Generic thresholds note; tune if you want different models
-  const warn = tokens > 3500 ? ' — near/over typical 4K limit' : '';
-  len.innerHTML = `Chars: ${chars} • Words: ${words} • Est. tokens: ${tokens}${warn}`;
-}
     function makeABVariants(){
       const base=buildPromptObj(); if(!base.text.trim()){showAlert('Nothing to variant — fill some fields first.','warning');return;}
       const A=base.text.replace(/Tone:[^\n]+/i,'Tone: friendly and concise');
@@ -944,7 +1081,64 @@ function renderPreview() {
 
     const DRAFT_KEY='prompt_draft_v1'; let autosaveTimer=null;
     function scheduleAutosave(){const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: typing…'; clearTimeout(autosaveTimer); autosaveTimer=setTimeout(saveDraft,600);}
-    function currentPromptData(){return{method:'tcrei',task:document.getElementById('tcrei_task').value,format:document.getElementById('tcrei_format').value,context:document.getElementById('tcrei_context').value,references:document.getElementById('tcrei_references').value,iterate:document.getElementById('tcrei_iterate').value,addTags:document.getElementById('tcrei_add_tags').checked,vars:{audience:document.getElementById('varAudience').value,tone:document.getElementById('varTone').value,length:document.getElementById('varLength').value},mode:document.getElementById('modeSelector').value};}
+    function currentPromptData(){
+      const method = document.getElementById('methodSelector').value;
+      if (method === 'tcrei') {
+        return {
+          method,
+          task:document.getElementById('tcrei_task').value,
+          format:document.getElementById('tcrei_format').value,
+          context:document.getElementById('tcrei_context').value,
+          references:document.getElementById('tcrei_references').value,
+          iterate:document.getElementById('tcrei_iterate').value,
+          addTags:document.getElementById('tcrei_add_tags').checked,
+          vars:{
+            audience:document.getElementById('varAudience').value,
+            tone:document.getElementById('varTone').value,
+            length:document.getElementById('varLength').value
+          },
+          mode:document.getElementById('modeSelector').value
+        };
+      } else if (method === 'design') {
+        return {
+          method,
+          description:document.getElementById('design_description').value,
+          environment:document.getElementById('design_environment').value,
+          style:document.getElementById('design_style').value,
+          illumination:document.getElementById('design_illumination').value,
+          gradation:document.getElementById('design_gradation').value,
+          nuances:document.getElementById('design_nuances').value,
+          references:document.getElementById('design_references').value
+        };
+      } else if (method === 'agent') {
+        return {
+          method,
+          objective:document.getElementById('agent_objective').value,
+          success:document.getElementById('agent_success').value,
+          scope:document.getElementById('agent_scope').value,
+          outofscope:document.getElementById('agent_outofscope').value,
+          constraints:document.getElementById('agent_constraints').value,
+          env:document.getElementById('agent_env').value,
+          extraVendors:document.getElementById('agent_extra_sources').value
+        };
+      }
+      return { method };
+    }
+
+    // Add the agent IDs to the listeners registration array:
+    [
+      'tcrei_task','tcrei_format','tcrei_context','tcrei_references','tcrei_iterate','tcrei_add_tags',
+      'design_description','design_environment','design_style','design_illumination','design_gradation','design_nuances','design_references',
+      // AGENT fields:
+      'agent_objective','agent_success','agent_scope','agent_outofscope','agent_constraints','agent_env','agent_extra_sources',
+      // shared
+      'varAudience','varTone','varLength','modeSelector','methodSelector'
+    ].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      const ev=(id==='tcrei_add_tags'||id==='methodSelector'||id==='modeSelector')?'change':'input';
+      el.addEventListener(ev,()=>{renderPreview(); scheduleAutosave();});
+    });    
     function saveDraft(){localStorage.setItem(DRAFT_KEY,JSON.stringify(currentPromptData())); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: saved';}
     function restoreDraft(){const raw=localStorage.getItem(DRAFT_KEY); if(!raw){showAlert('No draft found.','info');return;} const d=JSON.parse(raw);
       if(d.method==='tcrei'){document.getElementById('tcrei_task').value=d.task||'';document.getElementById('tcrei_format').value=d.format||'';document.getElementById('tcrei_context').value=d.context||'';document.getElementById('tcrei_references').value=d.references||'';document.getElementById('tcrei_iterate').value=d.iterate||'';document.getElementById('tcrei_add_tags').checked=!!d.addTags;document.getElementById('varAudience').value=d.vars?.audience||'';document.getElementById('varTone').value=d.vars?.tone||'';document.getElementById('varLength').value=d.vars?.length||'';document.getElementById('modeSelector').value=d.mode||'';renderPreview();showAlert('Draft restored.','success');}}
@@ -1061,10 +1255,31 @@ function renderPreview() {
     // Build whichever method is active
     function buildActiveObj() {
       const method = document.getElementById('methodSelector').value;
-      if (method === 'tcrei') return buildPromptObj();
+      if (method === 'tcrei')  return buildPromptObj();
       if (method === 'design') return buildDesignObj();
+      if (method === 'agent')  return buildAgentObj();
       return { text: '' };
     }
+    function toggleTemplateVisibility() {
+      const method = document.getElementById('methodSelector')?.value || 'tcrei';
+      const templateControl = document.getElementById('templatePreset').parentElement; 
+      // assumes the <select> and its <label> are wrapped together inside the inline-controls
+
+      if (method === 'tcrei') {
+        templateControl.style.display = 'inline';
+      } else {
+        templateControl.style.display = 'none';
+      }
+    }
+
+    // call on method change
+    document.getElementById('methodSelector').addEventListener('change', () => {
+      showMethodFields();
+      toggleTemplateVisibility();
+    });
+
+    // call once on load
+    document.addEventListener('DOMContentLoaded', toggleTemplateVisibility);
   </script>
 </body>
 </html>
