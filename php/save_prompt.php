@@ -1,110 +1,95 @@
 <?php
 // php/save_prompt.php
+ob_start(); // buffer anything accidental
 
+const DEBUG = false;
 require_once 'config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 
-// Enforce POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Only POST requests are allowed for this endpoint.']);
+function respond(int $status, array $payload): void {
+    // Drop any accidental output before sending JSON
+    if (ob_get_level()) { ob_clean(); }
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit();
 }
 
-// Optional: enforce JSON Content-Type (uncomment to be strict)
-// $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
-// if (stripos($contentType, 'application/json') === false) {
-//     http_response_code(415);
-//     echo json_encode(['error' => 'Content-Type must be application/json']);
-//     exit();
-// }
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    respond(405, ['ok' => false, 'error' => 'Only POST requests are allowed for this endpoint.']);
+}
 
-// Optional: size limit (1 MB)
-$maxBytes = 1024 * 1024; // 1 MB
+$maxBytes = 1024 * 1024;
 $contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : 0;
 if ($contentLength > $maxBytes) {
-    http_response_code(413);
-    echo json_encode(['error' => 'Payload too large. Limit is 1 MB.']);
-    exit();
+    respond(413, ['ok' => false, 'error' => 'Payload too large. Limit is 1 MB.']);
 }
 
-// Read and decode JSON
 $raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-
-// Validate JSON
-if (json_last_error() !== JSON_ERROR_NONE) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid JSON input']);
-    exit();
+if ($raw === false || $raw === '') {
+    respond(400, ['ok' => false, 'error' => 'Empty request body']);
 }
 
-// Required fields
-$required_fields = ['type', 'title', 'generated_prompt', 'prompt_data'];
-foreach ($required_fields as $field) {
+try {
+    $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+} catch (Throwable $e) {
+    respond(400, ['ok' => false, 'error' => 'Invalid JSON input', 'details' => DEBUG ? $e->getMessage() : null]);
+}
+
+$required = ['type', 'title', 'generated_prompt', 'prompt_data'];
+foreach ($required as $field) {
     if (!array_key_exists($field, $data)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing required field: ' . $field]);
-        exit();
+        respond(400, ['ok' => false, 'error' => "Missing required field: {$field}"]);
     }
 }
 
-// Normalise & basic validation
-$type            = trim((string)$data['type']);
-$title           = trim((string)$data['title']);
-$generated_prompt= (string)$data['generated_prompt'];
-$prompt_data_arr = $data['prompt_data'];
+$type             = trim((string)$data['type']);
+$title            = trim((string)$data['title']);
+$generated_prompt = (string)$data['generated_prompt'];
+$prompt_data_arr  = $data['prompt_data'];
 
-// Constrain allowed types (extend as needed)
 $allowedTypes = ['tcrei', 'design', 'agent'];
 if ($type === '' || !in_array($type, $allowedTypes, true)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid "type". Allowed: ' . implode(', ', $allowedTypes)]);
-    exit();
+    respond(400, ['ok' => false, 'error' => 'Invalid "type". Allowed: ' . implode(', ', $allowedTypes)]);
 }
-
 if ($title === '') {
-    http_response_code(400);
-    echo json_encode(['error' => 'Title cannot be empty']);
-    exit();
+    respond(400, ['ok' => false, 'error' => 'Title cannot be empty']);
 }
-
-// Clamp title length to match a sensible DB column size
 if (mb_strlen($title, 'UTF-8') > 255) {
     $title = mb_substr($title, 0, 255, 'UTF-8');
 }
 
-// Ensure prompt_data is JSON encodable
-$prompt_data_json = json_encode(
-    $prompt_data_arr,
-    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-);
+$prompt_data_json = json_encode($prompt_data_arr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 if ($prompt_data_json === false) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid prompt_data (not JSON encodable)']);
-    exit();
+    respond(400, ['ok' => false, 'error' => 'Invalid prompt_data (not JSON encodable)']);
 }
 
-// Use mysqli exceptions for cleaner error handling
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    $extra = isset($GLOBALS['DB_CONNECT_ERROR']) && $GLOBALS['DB_CONNECT_ERROR']
+        ? ' (' . $GLOBALS['DB_CONNECT_ERROR'] . ')'
+        : '';
+    respond(500, ['ok' => false, 'error' => 'Database connection not initialized' . $extra]);
+}
+
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    respond(500, ['ok' => false, 'error' => 'Database connection not initialized']);
+}
+
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    if (method_exists($conn, 'set_charset')) {
-        $conn->set_charset('utf8mb4');
-    }
+    $conn->set_charset('utf8mb4');
 
-    // Insert
-    $sql = "INSERT INTO prompts (type, title, generated_prompt, prompt_data) VALUES (?, ?, ?, ?)";
+    $sql  = "INSERT INTO prompts (type, title, generated_prompt, prompt_data) VALUES (?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('ssss', $type, $title, $generated_prompt, $prompt_data_json);
     $stmt->execute();
 
     $last_id = $conn->insert_id;
 
-    // Try to fetch created_at if your table has it
     $created_at = null;
     try {
         $q = $conn->prepare("SELECT created_at FROM prompts WHERE id = ? LIMIT 1");
@@ -113,32 +98,25 @@ try {
         $q->bind_result($created_at);
         $q->fetch();
         $q->close();
-    } catch (mysqli_sql_exception $e) {
-        // Column might not exist; ignore
-    }
+    } catch (mysqli_sql_exception $e) {}
 
-    echo json_encode([
-        'message' => 'Prompt saved successfully!',
-        'prompt'  => [
+    respond(200, [
+        'ok'     => true,
+        'message'=> 'Prompt saved successfully!',
+        'prompt' => [
             'id'               => $last_id,
             'type'             => $type,
             'title'            => $title,
             'generated_prompt' => $generated_prompt,
-            'prompt_data'      => $data['prompt_data'], // return original array
+            'prompt_data'      => $prompt_data_arr,
             'created_at'       => $created_at ?: date('c'),
-        ]
+        ],
     ]);
-
-    $stmt->close();
 
 } catch (mysqli_sql_exception $e) {
     error_log('[SAVE_PROMPT_ERROR] ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['error' => 'Failed to save prompt']);
+    respond(500, ['ok' => false, 'error' => DEBUG ? ('DB error: ' . $e->getMessage()) : 'Failed to save prompt']);
 } finally {
-    if ($conn) {
-        $conn->close();
-    }
+    if (isset($stmt) && $stmt instanceof mysqli_stmt) { $stmt->close(); }
+    if (isset($conn) && $conn instanceof mysqli) { $conn->close(); }
 }
-
-?>

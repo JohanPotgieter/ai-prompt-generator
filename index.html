@@ -105,7 +105,7 @@
     <h1>Gen AI Prompt Constructor</h1>
 
     <label for="methodSelector">Select Prompt Method:</label>
-    <select id="methodSelector" onchange="showMethodFields()">
+    <select id="methodSelector">
       <option value="tcrei">TCREI Method (Text Generation)</option>
       <option value="design">DESIGN Method (Image Generation)</option>
        <option value="agent">Agent Mode (Research & Implement)</option>
@@ -495,6 +495,10 @@
         <!-- AGENT (Research & Implement) -->
         <div id="agentMethod" class="method-section">
           <h2>Agent Mode (Research & Implement)</h2>
+          <div class="section-title">Agent Template</div>
+          <label for="agentTemplate">Choose a template</label>
+          <select id="agentTemplate"></select>
+          <small id="agentTemplateDesc" style="display:block;color:#666;margin-top:6px;"></small>
           <p>Build a browsable, source-cited, implementation-oriented prompt for an autonomous agent.</p>
 
           <div class="section-title">Objective</div>
@@ -633,97 +637,177 @@
   <script>
     let sessionPromptCounter=0,lastRestoredPromptData=null,currentSearchPage=1,totalPages=1;
     const promptsPerPage=10;
+    let DB_AGENT_TEMPLATES = {}; // key -> full payload object
+    let DB_TCREI_TEMPLATES = {};
+    let DB_DESIGN_TEMPLATES = {};
 
+    async function fetchTemplates(category) {
+      const res = await fetch(`php/templates_list.php?category=${encodeURIComponent(category)}&include_payload=1`);
+      if (!res.ok) throw new Error(`Failed to load ${category} templates`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || `Bad ${category} list`);
+      const map = {};
+      for (const t of data.templates) {
+        try {
+          if (t.payload && typeof t.payload === 'string') t.payload = JSON.parse(t.payload);
+        } catch (e) {
+          console.warn('Bad payload JSON for template', t.key, e);
+          t.payload = {};
+        }
+        map[t.key] = t;
+      }
+      return map;
+    }
+
+    async function initAgentTemplateSelectFromDB() {
+      const sel = document.getElementById('agentTemplate');
+      const desc = document.getElementById('agentTemplateDesc');
+      if (!sel) return; // no UI present
+
+      try {
+        DB_AGENT_TEMPLATES = await fetchTemplates('agent'); // { key -> {key,label,description,payload,...} }
+        sel.innerHTML = '';
+
+        Object.values(DB_AGENT_TEMPLATES)
+          .sort((a,b)=> (a.sort_order - b.sort_order) || a.label.localeCompare(b.label))
+          .forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.key;
+            opt.textContent = t.label;
+            sel.appendChild(opt);
+          });
+
+        if (DB_AGENT_TEMPLATES['wordpress_programmer']) {
+          sel.value = 'wordpress_programmer';
+        } else if (sel.options.length) {
+          sel.selectedIndex = 0;
+        }
+
+        // Change handler: prefill defaults and re-render
+        sel.addEventListener('change', () => {
+          applyAgentTemplate();
+          renderPreview();
+        });
+
+        // Initial apply
+        applyAgentTemplate();
+      } catch (err) {
+        console.error('Template load failed:', err);
+        // If you want a local fallback, define AGENT_TEMPLATES and populate sel here.
+      }
+    }
+
+    function applyAgentTemplate() {
+      const sel = document.getElementById('agentTemplate');
+      const desc = document.getElementById('agentTemplateDesc');
+      if (!sel) return;
+
+      const t = DB_AGENT_TEMPLATES[sel.value];
+      if (!t) {
+        if (desc) desc.textContent = '';
+        return;
+      }
+
+      // Optional: show short description if your table has it
+      if (desc) desc.textContent = t.description || '';
+
+      const d = (t.payload && t.payload.defaults) || {};
+
+      // Prefill only when empty
+      const setIfEmpty = (id, val) => {
+        if (!val) return;
+        const el = document.getElementById(id);
+        if (el && !el.value.trim()) el.value = Array.isArray(val) ? val.join('\n') : String(val);
+      };
+
+      setIfEmpty('agent_env',         d.env);
+      setIfEmpty('agent_scope',       d.scope);
+      setIfEmpty('agent_outofscope',  d.outofscope);
+      setIfEmpty('agent_constraints', d.constraints);
+    }
     function showAlert(message,type='success'){const b=document.getElementById('alert-banner');const m=document.getElementById('alert-message');b.className='alert';b.classList.add(type);m.innerHTML=message;b.style.display='block';b.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{b.style.display='none';},5000);}
     function normalizeInput(text){return (text||'').trim().replace(/\n{2,}/g,'\n');}
-    function buildAgentObj() {
-      if (document.getElementById('methodSelector').value !== 'agent') return { text: '' };
+function buildAgentObj() {
+  if (document.getElementById('methodSelector').value !== 'agent') return { text: '' };
 
-      const objective    = normalizeInput(document.getElementById('agent_objective').value);
-      const success      = normalizeInput(document.getElementById('agent_success').value);
-      const scope        = normalizeInput(document.getElementById('agent_scope').value);
-      const outofscope   = normalizeInput(document.getElementById('agent_outofscope').value);
-      const constraints  = normalizeInput(document.getElementById('agent_constraints').value);
-      const env          = normalizeInput(document.getElementById('agent_env').value);
-      const extraVendors = normalizeInput(document.getElementById('agent_extra_sources').value);
+  // Which template?
+  const tplKey = (document.getElementById('agentTemplate')?.value) || 'wordpress_programmer';
+  const tplRow = DB_AGENT_TEMPLATES[tplKey];
+  const p = tplRow?.payload || {};
 
-      // Source Priority block (append extra vendors if provided)
-      const extraLine = extraVendors ? `\n6) ${extraVendors}\n` : '\n6) {{domain-specific vendor docs}}\n';
-      const SOURCE_PRIORITY = 
-    `SOURCE PRIORITY (examples to start with)
-    1) WordPress Developer Resources & Plugin Handbook
-    2) WooCommerce Docs & Developer Docs
-    3) PHP Manual; MySQL Docs; MDN for front-end
-    4) Flywheel Help/Docs (hosting specifics)
-    5) OpenAI official docs when relevant${extraLine}(Avoid Wikipedia unless no primary sources exist.)`;
+  // Gather user inputs
+  const normalize = normalizeInput;
+  const objective    = normalize(document.getElementById('agent_objective').value);
+  const success      = normalize(document.getElementById('agent_success').value);
+  const scope        = normalize(document.getElementById('agent_scope').value);
+  const outofscope   = normalize(document.getElementById('agent_outofscope').value);
+  const constraints  = normalize(document.getElementById('agent_constraints').value);
+  const env          = normalize(document.getElementById('agent_env').value);
+  const extraVendors = normalize(document.getElementById('agent_extra_sources').value);
 
-      const CONTEXT = 
-    `CONTEXT
-    - Stack: WordPress (custom plugin single-repo), WooCommerce, PHP 8+, MySQL, jQuery/Bootstrap. Local dev via Local by Flywheel (Windows 11); prod on Flywheel (NGINX); timezone: Australia/Brisbane (AEST; no DST).
-    - Preferences: runnable code + clear placement instructions + concise reasoning bullets; prefer primary sources. Avoid Wikipedia unless no primary source is available.`;
+  // Helpers
+  const bullet = (arr, prefix = '-') =>
+    (Array.isArray(arr) && arr.length) ? arr.map(x => `${prefix} ${x}`).join('\n') : '';
 
-      const TASK =
-    `TASK
-    - Objective: ${objective || '{{what to achieve}}'}
-    - Success criteria: ${success || '{{measurable outcomes}}'}
-    - Scope / Out of scope: ${(scope||'').trim() || '{{lists}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscope}` : ''}
-    - Constraints: ${constraints || '{{perf, security, compliance, time, budget}}'}
-    - Environment details: ${env || '{{versions, plugin names, relevant paths}}'}`;
+  const numbered = (arr) =>
+    (Array.isArray(arr) && arr.length) ? arr.map((x,i)=> `${i+1}) ${x}`).join('\n') : '';
 
-      const TOOLS_ACTIONS =
-    `TOOLS & ACTIONS
-    - You may browse the web, read/place files, and create artifacts. For high-impact changes (security, data loss risk), PAUSE and request confirmation before acting.
-    - Prefer these source types, in order: vendor/official docs; standards bodies; original blog posts/release notes; well-established community docs. Provide inline citations and a short **Sources** section.`;
+  const section = (title, body) => body ? `${title}\n${body}` : '';
 
-      const WORKFLOW =
-    `WORKFLOW
-    1) Clarify assumptions (≤5 bullets). Then outline a short plan (steps).
-    2) Execute research with citations; compare at least 2 primary sources when applicable.
-    3) Deliver artifacts:
-      - Code (ready to paste) with exact file path and hooks/filters used
-      - Any commands (WP-CLI, SQL, cURL) needed
-      - Minimal test plan + rollback instructions
-      - Changelog of files touched
-    4) If blocked, present 2–3 options with trade-offs and your recommendation.
-    5) Stop if credentials are required or an irreversible action is detected—ask for approval.`;
+  // Sections from template
+  const roleGoal      = p.roleGoal ? `ROLE & GOAL\n${p.roleGoal}` : '';
+  const contextBlock  = section('CONTEXT', bullet(p.context));
+  const sourcesBlock  = section('SOURCE PRIORITY', numbered(
+    extraVendors ? [...(p.sources||[]), extraVendors] : (p.sources||[])
+  ));
+  const workflowBlock = section('WORKFLOW', numbered(p.workflow));
 
-      const OUTPUT_QUALITY =
-    `OUTPUT FORMAT
-    - **Assumptions**
-    - **Plan** (bullet list)
-    - **Implementation** (code + where to place it)
-    - **Tests** (how to verify)
-    - **Rollback** (how to undo)
-    - **Sources** (3–7 links, official docs first)
+  // Output clusters
+  const fmt  = bullet(p.output?.format);
+  const qual = bullet(p.output?.quality);
+  const conf = bullet(p.output?.confirm);
 
-    QUALITY BARS
-    - Security: sanitize/escape/nonce in WordPress; least privilege; avoid secrets in code.
-    - Performance: O(n) where feasible; cache/indices when needed.
-    - Accessibility: semantic HTML; color contrast; ARIA when relevant.
-    - Observability: add concise logs around risky areas.
+  const outputBlock =
+    [
+      section('OUTPUT FORMAT', fmt),
+      section('QUALITY BARS',  qual),
+      section('CONFIRMATION BREAKPOINTS', conf)
+    ].filter(Boolean).join('\n\n');
 
-    CONFIRMATION BREAKPOINTS
-    - Any DB schema change, htaccess/NGINX update, auth/session changes, or writes outside plugin directory.`;
+  // User TASK section (always included)
+  const taskBlock = `TASK
+- Objective: ${objective || '{{what to achieve}}'}
+- Success criteria: ${success || '{{measurable outcomes}}'}
+- Scope / Out of scope:
+${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscope}` : ''}
+- Constraints: ${constraints || '{{perf, security, compliance, time, budget}}'}
+- Environment details: ${env || '{{versions, tools, paths}}'}`;
 
-      const header = 
-    `ROLE & GOAL
-    You are an autonomous engineering/research agent assisting Joe (casual tone). Your goal is to produce working, documented outputs and cite trustworthy sources.`;
+  // Tools & Actions: from template if provided, else a sane default
+  const toolsBlock = p.toolsActions
+    ? section('TOOLS & ACTIONS', bullet(p.toolsActions))
+    : `TOOLS & ACTIONS
+- You may browse the web, read/place files, and create artifacts. For high-impact changes (security, data loss risk), PAUSE and request confirmation before acting.
+- Prefer these source types, in order: vendor/official docs; standards bodies; original blog posts/release notes; well-established community docs. Provide inline citations and a short **Sources** section.`;
 
-      const text = [
-        header,
-        CONTEXT,
-        TASK,
-        TOOLS_ACTIONS,
-        SOURCE_PRIORITY,
-        WORKFLOW,
-        OUTPUT_QUALITY
-      ].join('\n\n');
+  // Compose only non-empty parts
+  const text = [
+    roleGoal,
+    contextBlock,
+    taskBlock,
+    toolsBlock,
+    sourcesBlock,
+    workflowBlock,
+    outputBlock
+  ].filter(Boolean).join('\n\n');
 
-      return {
-        text,
-        objective, success, scope, outofscope, constraints, env, extraVendors
-      };
-    }
+  return {
+    text,
+    template_key: tplKey,
+    objective, success, scope, outofscope, constraints, env, extraVendors
+  };
+}
+
 
     // ---- AGENT linter ----
     function lintAgent(obj) {
@@ -740,65 +824,118 @@
     function deepEqual(a,b){if(a===b)return true;if(a==null||typeof a!='object'||b==null||typeof b!='object')return false;const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;for(const k of ka){if(!kb.includes(k)||!deepEqual(a[k],b[k]))return false}return true}
 
     async function generatePromptAndSave(method){
-      let combinedPrompt=''; let promptData={method};
-      if(method==='tcrei'){ /* existing TCREI block stays as-is */ }
-      else if(method==='design'){ /* existing DESIGN block stays as-is */ }
-      else if(method==='agent'){
-        // Collect + build
-        const obj = buildAgentObj();
-        // basic guard: require at least objective
-        if (!obj.objective?.trim()) { showAlert('Please add an Objective for Agent Mode.','warning'); return; }
+      let combinedPrompt = '';
+      let promptData = { method };
+
+      if (method === 'tcrei') {
+        const obj = buildPromptObj();
+        if (!obj.text?.trim()) { showAlert('Fill some TCREI fields first.','warning'); return; }
         combinedPrompt = obj.text;
         Object.assign(promptData, {
-          objective: obj.objective,
-          success: obj.success,
-          scope: obj.scope,
-          outofscope: obj.outofscope,
-          constraints: obj.constraints,
-          env: obj.env,
-          extraVendors: obj.extraVendors
+          task: obj.task, format: obj.format, context: obj.context,
+          references: obj.references, iterate: obj.iterate, addTags: !!obj.addTags
         });
+      } else if (method === 'design') {
+        const obj = buildDesignObj();
+        if (!obj.text?.trim()) { showAlert('Fill some DESIGN fields first.','warning'); return; }
+        combinedPrompt = obj.text;
+        Object.assign(promptData, {
+          description: obj.description, environment: obj.environment, style: obj.style,
+          illumination: obj.illumination, gradation: obj.gradation, nuances: obj.nuances,
+          references: obj.references
+        });
+      } else if (method === 'agent') {
+        const obj = buildAgentObj();
+        if (!obj.objective?.trim()) { showAlert('Please add an Objective for Agent Mode.','warning'); return; }
+        combinedPrompt = obj.text;
+        Object.assign(promptData, obj);
       }
 
-      if(combinedPrompt){
-        let saveToDB=true, sessionPromptTitle='', isNew=true;
-        if(lastRestoredPromptData && deepEqual(promptData,lastRestoredPromptData)){
-          showAlert('No changes detected. Prompt not saved as a new copy.','info');
-          saveToDB=false; isNew=false; sessionPromptTitle=`Loaded Prompt (No Changes) ${++sessionPromptCounter}`;
-        }
-        if(saveToDB){
-          const date=new Date();
-          const dbSaveTitle=`${method.toUpperCase()} Prompt - ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-          const saved=await savePromptToDB(dbSaveTitle,combinedPrompt,promptData);
-          if(saved){
-            sessionPromptTitle=`${method.toUpperCase()} Session Prompt ${++sessionPromptCounter} - ${date.toLocaleTimeString()}`;
-            addPromptToAccordion(sessionPromptTitle,combinedPrompt,promptData,saved.id,'#sessionPromptHistoryContainer');
-            document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
-          } else { sessionPromptTitle=''; }
-        }
-        if(sessionPromptTitle && !isNew){
-          addPromptToAccordion(sessionPromptTitle,combinedPrompt,promptData,'session-'+sessionPromptCounter,'#sessionPromptHistoryContainer');
+      if (!combinedPrompt) return;
+
+      let saveToDB = true, sessionPromptTitle = '', isNew = true;
+      if (lastRestoredPromptData && deepEqual(promptData, lastRestoredPromptData)) {
+        showAlert('No changes detected. Prompt not saved as a new copy.','info');
+        saveToDB = false; isNew = false;
+        sessionPromptTitle = `Loaded Prompt (No Changes) ${++sessionPromptCounter}`;
+      }
+
+      if (saveToDB) {
+        const date = new Date();
+        const dbSaveTitle = `${method.toUpperCase()} Prompt - ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        const payload = {
+          type: method,
+          title: dbSaveTitle,
+          generated_prompt: combinedPrompt,
+          prompt_data: promptData
+        };
+        const saved = await savePromptToDB(payload);
+
+        if (saved && saved.id) {
+          sessionPromptTitle = `${method.toUpperCase()} Session Prompt ${++sessionPromptCounter} - ${date.toLocaleTimeString()}`;
+          addPromptToAccordion(sessionPromptTitle, combinedPrompt, promptData, saved.id, '#sessionPromptHistoryContainer');
           document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
         }
-        renderPreview();
       }
+
+      if (sessionPromptTitle && !isNew) {
+        addPromptToAccordion(sessionPromptTitle, combinedPrompt, promptData, 'session-'+sessionPromptCounter, '#sessionPromptHistoryContainer');
+        document.querySelector('#sessionPromptHistoryContainer .no-prompts-message')?.remove();
+      }
+
+      renderPreview();
     }
 
-    async function savePromptToDB(title,generated_prompt,prompt_data){
-      try{
-        const res=await fetch('php/save_prompt.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:prompt_data.method,title,generated_prompt,prompt_data})});
-        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed to save')}
-        const result=await res.json();showAlert(result.message,'success');return result.prompt;
-      }catch(err){console.error(err);showAlert(`Error saving prompt: ${err.message}`,'error');return null;}
+   async function savePromptToDB(payload) {
+      const res = await fetch('php/save_prompt.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const bodyText = await res.text();
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText} — ${bodyText || '(empty response)'}`);
+      }
+      if (!bodyText || !bodyText.trim()) {
+        throw new Error('Server returned an empty response body.');
+      }
+
+      let data;
+      try { data = JSON.parse(bodyText); }
+      catch { throw new Error(`Invalid JSON from server: ${bodyText.slice(0, 400)}`); }
+
+      // Support both shapes:
+      //  - { ok: true, id, prompt: {...} }   (recommended)
+      //  - { message: '...', prompt: {...} } (older)
+      if (data.ok === false) throw new Error(data.error || 'Server returned ok:false');
+
+      const record = data.prompt || data; // be tolerant
+      return {
+        ok: data.ok !== false,
+        id: record.id,
+        prompt: record
+      };
     }
 
     async function deletePrompt(id){
-      if(!confirm('Delete this prompt from the database?'))return;
+      if(!confirm('Delete this prompt from the database?')) return;
       try{
-        const res=await fetch('php/delete_prompt.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
-        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed to delete')}
-        const result=await res.json();showAlert(result.message,'success');searchPrompts(currentSearchPage);
-      }catch(err){console.error(err);showAlert(`Error deleting prompt: ${err.message}`,'error');}
+        const res = await fetch('php/delete_prompt.php', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({id})
+        });
+        const txt = await res.text();
+        const json = (()=>{ try { return JSON.parse(txt); } catch { return null; }})();
+        if (!res.ok) throw new Error((json && json.error) || txt || 'Failed to delete');
+        showAlert((json && json.message) || 'Deleted','success');
+        searchPrompts(currentSearchPage);
+      }catch(err){
+        console.error(err);
+        showAlert(`Error deleting prompt: ${err.message}`,'error');
+      }
     }
 
     async function searchPrompts(page = 1, isSearchButtonClicked = false) {
@@ -956,12 +1093,27 @@
     function changePage(d){const p=currentSearchPage+d; if(p>=1&&p<=totalPages){searchPrompts(p,true);}}
     function updatePaginationControls(cur=currentSearchPage,tot=totalPages){document.getElementById('currentPageSpan').textContent=`Page ${cur} of ${tot}`;document.getElementById('prevPageBtn').disabled=(cur===1);document.getElementById('nextPageBtn').disabled=(cur===tot||tot===0);}
 
-    document.getElementById('clearAllDbPrompts').onclick=async function(){
-      if(confirm('Clear ALL saved prompts from the database?')){ try{
-        const res=await fetch('php/clear_all_prompts.php',{method:'POST',headers:{'Content-Type':'application/json'}});
-        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed to clear');}
-        const result=await res.json(); showAlert(result.message,'success'); listAllPrompts();
-      }catch(err){console.error(err);showAlert(`Error: ${err.message}`,'error');}}
+    document.getElementById('clearAllDbPrompts').onclick = async function () {
+      if (!confirm('Clear ALL saved prompts from the database?')) return;
+      try {
+        const res = await fetch('php/clear_all_prompts.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          // read text to avoid a second .json() call when server returns non-JSON
+          const eText = await res.text();
+          throw new Error(eText || 'Failed to clear');
+        }
+
+        const result = await res.json();
+        showAlert(result.message, 'success');
+        listAllPrompts();
+      } catch (err) {
+        console.error(err);
+        showAlert(`Error: ${err.message}`, 'error');
+      }
     };
 
     // ---------- Enhancements: chips, presets, variables, linter, tokens, preview, autosave, A/B, import/export, shortcuts ----------
@@ -1125,28 +1277,19 @@
       return { method };
     }
 
-    // Add the agent IDs to the listeners registration array:
-    [
-      'tcrei_task','tcrei_format','tcrei_context','tcrei_references','tcrei_iterate','tcrei_add_tags',
-      'design_description','design_environment','design_style','design_illumination','design_gradation','design_nuances','design_references',
-      // AGENT fields:
-      'agent_objective','agent_success','agent_scope','agent_outofscope','agent_constraints','agent_env','agent_extra_sources',
-      // shared
-      'varAudience','varTone','varLength','modeSelector','methodSelector'
-    ].forEach(id=>{
-      const el=document.getElementById(id);
-      if(!el) return;
-      const ev=(id==='tcrei_add_tags'||id==='methodSelector'||id==='modeSelector')?'change':'input';
-      el.addEventListener(ev,()=>{renderPreview(); scheduleAutosave();});
-    });    
+    // Add the agent IDs to the listeners registration array: 
     function saveDraft(){localStorage.setItem(DRAFT_KEY,JSON.stringify(currentPromptData())); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: saved';}
     function restoreDraft(){const raw=localStorage.getItem(DRAFT_KEY); if(!raw){showAlert('No draft found.','info');return;} const d=JSON.parse(raw);
       if(d.method==='tcrei'){document.getElementById('tcrei_task').value=d.task||'';document.getElementById('tcrei_format').value=d.format||'';document.getElementById('tcrei_context').value=d.context||'';document.getElementById('tcrei_references').value=d.references||'';document.getElementById('tcrei_iterate').value=d.iterate||'';document.getElementById('tcrei_add_tags').checked=!!d.addTags;document.getElementById('varAudience').value=d.vars?.audience||'';document.getElementById('varTone').value=d.vars?.tone||'';document.getElementById('varLength').value=d.vars?.length||'';document.getElementById('modeSelector').value=d.mode||'';renderPreview();showAlert('Draft restored.','success');}}
     function clearDraft(){localStorage.removeItem(DRAFT_KEY); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: cleared';}
     [
       'tcrei_task','tcrei_format','tcrei_context','tcrei_references','tcrei_iterate','tcrei_add_tags',
-      'design_description','design_environment','design_style','design_illumination','design_gradation','design_nuances','design_references',
-      'varAudience','varTone','varLength','modeSelector','methodSelector'
+        'design_description','design_environment','design_style','design_illumination','design_gradation','design_nuances','design_references',
+        // AGENT fields:
+        'agentTemplate', 
+        'agent_objective','agent_success','agent_scope','agent_outofscope','agent_constraints','agent_env','agent_extra_sources',
+        // shared
+        'varAudience','varTone','varLength','modeSelector','methodSelector'
     ].forEach(id=>{
       const el=document.getElementById(id);
       if(!el) return;
@@ -1166,6 +1309,9 @@
     document.addEventListener('keydown',e=>{const cmd=e.metaKey||e.ctrlKey; if(!cmd)return; if(e.key.toLowerCase()==='enter'){e.preventDefault(); generatePromptAndSave('tcrei');} if(e.key.toLowerCase()==='k'){e.preventDefault(); clearFormFields(); renderPreview();} if(e.key==='/'){e.preventDefault(); document.querySelectorAll('.tooltiptext').forEach(tt=>{tt.style.visibility=(tt.style.visibility==='visible')?'hidden':'visible'; tt.style.opacity=(tt.style.opacity==='1')?'0':'1';});}});
 
         document.addEventListener('DOMContentLoaded', () => {
+          initAgentTemplateSelectFromDB();
+          showMethodFields();
+          toggleTemplateVisibility();          
           showMethodFields();
           document.getElementById('searchResultsContainer').innerHTML =
             '<p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>';
@@ -1251,7 +1397,6 @@
       }
       return issues;
     }
-
     // Build whichever method is active
     function buildActiveObj() {
       const method = document.getElementById('methodSelector').value;
@@ -1262,14 +1407,10 @@
     }
     function toggleTemplateVisibility() {
       const method = document.getElementById('methodSelector')?.value || 'tcrei';
-      const templateControl = document.getElementById('templatePreset').parentElement; 
-      // assumes the <select> and its <label> are wrapped together inside the inline-controls
-
-      if (method === 'tcrei') {
-        templateControl.style.display = 'inline';
-      } else {
-        templateControl.style.display = 'none';
-      }
+      const tcreiPresetWrap = document.getElementById('templatePreset')?.parentElement;
+      const agentTpl = document.getElementById('agentTemplate')?.parentElement;
+      if (tcreiPresetWrap) tcreiPresetWrap.style.display = (method === 'tcrei') ? 'inline' : 'none';
+      if (agentTpl) agentTpl.style.display = (method === 'agent') ? 'inline' : 'none';
     }
 
     // call on method change
