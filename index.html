@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <link href="genAI.png" rel="icon" type="image/png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <title>Gen AI Prompt Constructor</title>
   <style>
     body{font-family:Arial, sans-serif;margin:20px;background:#f4f4f4;color:#333}
@@ -80,7 +81,16 @@
     .side-panel{position:sticky;top:12px;align-self:start;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}
     .side-panel h3{margin:6px 0 10px 0;font-size:1.05rem;color:#333}
     .side-panel .meter{font-size:.9em;color:#555;margin:4px 0 8px 0}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#f1f5f9;font-size:.75em;margin-right:6px}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 10px;border-radius:12px;font-weight:600;
+      font-size:.75rem;line-height:1;border:1px solid transparent
+    }
+    .badge--idle   { background:#e2e8f0; color:#0f172a; border-color:#cbd5e1 } /* slate on gray */
+    .badge--typing { background:#fff7ed; color:#7c2d12; border-color:#fed7aa } /* amber */
+    .badge--saved  { background:#dcfce7; color:#14532d; border-color:#bbf7d0 } /* green */
+    .badge--error  { background:#fee2e2; color:#7f1d1d; border-color:#fecaca } /* red */
+    .badge--clear  { background:#f1f5f9; color:#0f172a; border-color:#e2e8f0 } /* neutral */
 
     /* Preview */
     .preview{white-space:pre-wrap;border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#f9fafb;font-family:system-ui,sans-serif;font-size:.92em}
@@ -96,6 +106,27 @@
   </style>
 </head>
 <body>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <div class="modal fade" id="wizardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content" style="border-radius:12px;">
+        <div class="modal-header">
+          <h5 class="modal-title" id="wizardModalTitle">Wizard</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="wizardForm">
+          <div class="modal-body" id="wizardModalBody">
+            <!-- dynamic -->
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Insert</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>  
+
   <div class="container">
     <div id="alert-banner" class="alert" style="display:none;">
       <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
@@ -116,22 +147,9 @@
     <!-- Controls row: presets, mode, variables -->
     <div class="inline-controls">
       <label style="font-weight:600;">Template:</label>
-      <select id="templatePreset" onchange="applyTemplate(this.value)">
-        <option value="">— Select a preset —</option>
-        <option value="blog">Blog Post</option>
-        <option value="product">Product Description</option>
-        <option value="email">Email Campaign</option>
-        <option value="bug">Bug Report</option>
+      <select id="templatePreset">
+        <option value="">— Loading templates… —</option>
       </select>
-
-      <label style="font-weight:600;">Mode:</label>
-      <select id="modeSelector" onchange="renderPreview()">
-        <option value="">None</option>
-        <option value="concise">Be concise</option>
-        <option value="creative">Be creative</option>
-        <option value="factual">Be factual, cite sources</option>
-      </select>
-
       <label style="font-weight:600;">Audience:</label>
       <input type="text" id="varAudience" placeholder="e.g., non-technical SMB owners" oninput="renderPreview()">
       <label style="font-weight:600;">Tone:</label>
@@ -504,29 +522,68 @@
           <div class="section-title">Objective</div>
           <label for="agent_objective">What do you want achieved?</label>
           <textarea id="agent_objective" placeholder="e.g., Implement membership renewal resend link in Woo admin..."></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_objective','Implement admin action: resend membership renewal email for a user')">Implement action</span>
+  <span class="chip" onclick="insertChip('agent_objective','Fix bug: double-charging on renewal when status is pending-cancel')">Fix bug</span>
+  <span class="chip" onclick="insertChip('agent_objective','Research and propose approach for multi-step form with validation + autosave')">Research & propose</span>
+  <span class="chip" onclick="insertChip('agent_objective','Create migration plan to rotate Stripe API keys across environments')">Migration plan</span>
+  <span class="chip" onclick="objectiveWizard()">Guide me…</span>
+</div>
 
           <div class="section-title">Success Criteria</div>
           <label for="agent_success">How will we measure success?</label>
           <textarea id="agent_success" placeholder="e.g., Link appears under 'Next Bill On', sends correct email template, logs action..."></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_success','- Admin UI shows a “Resend Renewal” link under Next Bill On\n- Correct email template is sent and logged\n- Action is nonce-protected and capability-checked\n- Unit test covers happy-path + invalid nonce')">Typical AC</span>
+  <span class="chip" onclick="insertChip('agent_success','- Page load impact < 50ms\n- No new PHP warnings/notices\n- Rollback plan documented in PR')">Perf/quality</span>
+  <span class="chip" onclick="successWizard()">Guide me…</span>
+</div>
 
           <div class="section-title">Scope / Out of Scope</div>
           <label for="agent_scope">In scope (bullet list)</label>
           <textarea id="agent_scope" placeholder="- Add admin link\n- Trigger existing email template\n- Include nonce + capability checks"></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_scope','- Add admin link under Next Bill On\n- Trigger existing renewal email template\n- Log action with user/timezone (AEST)\n- Unit/integration tests where practical')">Core scope</span>
+  <span class="chip" onclick="insertChip('agent_scope','- Use WP nonces + capability checks\n- No raw SQL unless $wpdb->prepare\n- Escaping/sanitization on all inputs/outputs')">Security scope</span>
+  <span class="chip" onclick="scopeWizard()">Guide me…</span>
+</div>
 
           <label for="agent_outofscope">Out of scope (bullet list)</label>
           <textarea id="agent_outofscope" placeholder="- New email templates\n- DB schema changes"></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_outofscope','- Creating new email templates\n- DB schema changes\n- Subscription proration logic\n- Payment provider switching')">Common OOS</span>
+  <span class="chip" onclick="outOfScopeWizard()">Guide me…</span>
+</div>
 
           <div class="section-title">Constraints</div>
           <label for="agent_constraints">Perf, security, compliance, time/budget</label>
           <textarea id="agent_constraints" placeholder="- Follow WP nonces/escapes\n- No raw SQL without $wpdb->prepare\n- AEST logs only"></textarea>
+          <div class="chips">
+            <span class="chip" onclick="insertChip('agent_constraints','- Performance: TTFB < 200ms; DB queries < 100ms; cache reads; paginate long lists')">Perf budget</span>
+            <span class="chip" onclick="insertChip('agent_constraints','- Security: Nonce + capability checks; sanitize/escape; use $wpdb->prepare for SQL')">Security basics</span>
+            <span class="chip" onclick="insertChip('agent_constraints','- Compliance: No PII in logs; respect consent; redact user data in errors')">Compliance</span>
+            <span class="chip" onclick="insertChip('agent_constraints','- Time/Budget: MVP in 6 hours; no paid APIs; prioritize low-risk changes')">Time/Budget</span>
+            <span class="chip" onclick="insertChip('agent_constraints','- Reliability/Observability: Log in AEST; handle errors; backoff retries for remote calls')">Reliability</span>
+            <span class="chip" onclick="constraintsWizard()">Guide me…</span>
+          </div>
 
           <div class="section-title">Environment Details</div>
           <label for="agent_env">Versions, plugin names, paths</label>
           <textarea id="agent_env" placeholder="PHP 8+, WP + Woo, Local by Flywheel (Win11), prod on Flywheel (NGINX). Plugin: /wp-content/plugins/oi-mods/ (single repo). TZ: Australia/Brisbane (AEST; no DST)."></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_env','PHP 8.2; WordPress 6.5+; WooCommerce 8.x\nLocal: Win11 (Local by Flywheel)\nProd: Flywheel (NGINX)\nPlugin: /wp-content/plugins/oi-mods/\nTZ: Australia/Brisbane (AEST; no DST)')">WP/Woo baseline</span>
+  <span class="chip" onclick="insertChip('agent_env','Node 20.x for tooling; Composer 2.x; MySQL 8.x\nError logging: AEST; redact PII\nFeature flags via env var')">Tooling baseline</span>
+  <span class="chip" onclick="envWizard()">Guide me…</span>
+</div>
 
           <div class="section-title">Extra Vendor Docs (optional)</div>
           <label for="agent_extra_sources">Add domain-specific docs to prioritize</label>
           <textarea id="agent_extra_sources" placeholder="- Formidable Forms developer docs\n- Woo Memberships docs"></textarea>
+<div class="chips">
+  <span class="chip" onclick="insertChip('agent_extra_sources','- WordPress Developer Docs\n- WooCommerce Memberships Docs\n- Formidable Forms Developer Docs')">WP stack</span>
+  <span class="chip" onclick="insertChip('agent_extra_sources','- Stripe API Docs (Billing/Invoices)\n- Flywheel Platform Docs\n- PHP-FIG PSR-12 (coding style)')">Infra/payment</span>
+  <span class="chip" onclick="vendorWizard()">Guide me…</span>
+</div>
 
           <button type="button" onclick="generatePromptAndSave('agent')">Generate Agent Prompt & Save</button>
         </div>
@@ -635,9 +692,14 @@
 
   <!-- Core logic (enhancements + your existing functions) -->
   <script>
+    // Null-safe DOM helpers
+    const $ = (id) => document.getElementById(id);
+    const val = (id) => ($(`${id}`)?.value ?? '');
+    const checked = (id) => !!$(`${id}`)?.checked;
+
     let sessionPromptCounter=0,lastRestoredPromptData=null,currentSearchPage=1,totalPages=1;
     const promptsPerPage=10;
-    let DB_AGENT_TEMPLATES = {}; // key -> full payload object
+    let DB_AGENT_TEMPLATES = {}; 
     let DB_TCREI_TEMPLATES = {};
     let DB_DESIGN_TEMPLATES = {};
 
@@ -658,44 +720,496 @@
       }
       return map;
     }
+    // Hoisted/TDZ-safe autosave timer
+    var autosaveTimer = null;
 
-    async function initAgentTemplateSelectFromDB() {
-      const sel = document.getElementById('agentTemplate');
-      const desc = document.getElementById('agentTemplateDesc');
-      if (!sel) return; // no UI present
+    function setAutosaveStatus(state, text){
+      const b = document.getElementById('autosaveStatus');
+      if (!b) return;
+      b.className = 'badge badge--' + state;
+      b.textContent = text;
+    }
 
+    function scheduleAutosave(){
+      setAutosaveStatus('typing','Autosave: typing…');
+      try { clearTimeout(autosaveTimer); } catch(_) {}
+      autosaveTimer = setTimeout(saveDraft, 600);
+    }
+
+    // Mini local fallback presets (only used if DB returns nothing or errors)
+    const TCREI_FALLBACK_PRESETS = {
+      blog:{label:'Blog Post',payload:{
+        task:"Write a blog post explaining {{topic}} to {{audience}}.",
+        format:"Formatted in Markdown. Use headings, short paragraphs, and bullet lists where helpful.",
+        context:"Tone: {{tone}}. Length: {{length}}. Include 3 real-world examples and a brief conclusion.",
+        references:"",
+        iterate:"Critique for clarity, remove redundancy, add a concise summary at the end."
+      }},
+      product:{label:'Product Description',payload:{
+        task:"Create a compelling product description for {{topic}}.",
+        format:"Markdown with intro, bullet features, and benefits section.",
+        context:"Audience: {{audience}}. Tone: {{tone}}. Length: {{length}}.",
+        references:"Use brand style guide where applicable.",
+        iterate:"Tighten copy; emphasise benefits; add a persuasive CTA."
+      }},
+      email:{label:'Email Campaign',payload:{
+        task:"Write an email campaign introducing {{topic}} to {{audience}}.",
+        format:"Subject + preview + body (short paragraphs + bullets).",
+        context:"Tone: {{tone}}. Keep it concise. One strong CTA.",
+        references:"",
+        iterate:"A/B test two subject lines and two CTAs."
+      }},
+      bug:{label:'Bug Report',payload:{
+        task:"Draft a clear bug report.",
+        format:"Sections: Summary, Steps, Expected, Actual, Environment, Screenshots.",
+        context:"Audience: engineering. Be precise; avoid ambiguity.",
+        references:"",
+        iterate:"Ensure steps are minimal yet reproducible."
+      }}};
+      const AGENT_FALLBACK_TEMPLATES = {
+        wordpress_programmer: {
+          label: 'WordPress Programmer',
+          description: 'Research + implement in WP/Woo contexts',
+          payload: {
+            defaults: {
+              env: 'PHP 8.2; WordPress 6.5+; WooCommerce 8.x\nLocal: Win11 (Local by Flywheel)\nProd: Flywheel (NGINX)\nPlugin: /wp-content/plugins/oi-mods/\nTZ: Australia/Brisbane (AEST; no DST)',
+              scope: '- Add admin link\n- Reuse existing templates\n- Nonce + capability checks\n- Logging (actor/user/time, AEST)\n- Unit/integration tests',
+              outofscope: '- New email templates\n- DB schema changes\n- Payment provider switching',
+              constraints: '- Performance: TTFB < 200ms; DB < 100ms\n- Security: sanitize/escape; $wpdb->prepare\n- Compliance: no PII in logs\n- Time/Budget: MVP today'
+            }
+          }
+        },
+        research_general: {
+          label: 'Researcher (General)',
+          description: 'Source-cited research + summary',
+          payload: {
+            defaults: {
+              env: '',
+              scope: '- Triage sources\n- Summarise with quotes\n- Provide links + inline citations',
+              outofscope: '- Long code implementations\n- Non-public/unverifiable claims',
+              constraints: '- Cite every non-obvious claim\n- Prefer primary/vendor docs\n- Timebox: 2 hours'
+            }
+          }
+        }
+      };
+
+    function applyTcreiTemplate(key){
+      if (!key) return;
+
+      // Prefer DB payload
+      const row = DB_TCREI_TEMPLATES?.[key];
+      if (row?.payload) {
+        applyTcreiTemplateFromPayload(row.payload);
+        return;
+      }
+
+      // Local fallback
+      const fb = TCREI_FALLBACK_PRESETS?.[key];
+      if (fb?.payload) {
+        applyTcreiTemplateFromPayload(fb.payload);
+        return;
+      }
+
+      console.warn('TCREI template not found for key:', key);
+    }
+    /**
+    * Apply a TCREI template row from DB into the five TCREI fields.
+    * Falls back to legacy PRESETS if the key isn’t in DB.
+    */
+    function applyTcreiTemplate(key) {
+      if (!key) return;
+
+      const row = DB_TCREI_TEMPLATES[key];
+      if (!row || !row.payload) {
+        // Fallback to legacy PRESETS if defined
+        if (typeof PRESETS !== 'undefined' && PRESETS[key]) {
+          applyTemplate(key); // your existing function
+          renderPreview();
+          if (typeof scheduleAutosave === 'function') scheduleAutosave();
+        }
+        return;
+      }
+
+      // Payload shape: { task, format, context, references, iterate, defaults? }
+      const p = row.payload || {};
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = val ? String(val) : '';
+      };
+
+      set('tcrei_task',       p.task);
+      set('tcrei_format',     p.format);
+      set('tcrei_context',    p.context);
+      set('tcrei_references', p.references);
+      set('tcrei_iterate',    p.iterate);
+
+      // Optional: hydrate the inline vars (Audience/Tone/Length) if provided
+      if (p.defaults && p.defaults.vars) {
+        const v = p.defaults.vars;
+        if (v.audience) document.getElementById('varAudience').value = v.audience;
+        if (v.tone)     document.getElementById('varTone').value     = v.tone;
+        if (v.length)   document.getElementById('varLength').value   = v.length;
+      }
+
+      if (($('methodSelector')?.value === 'tcrei')) {
+        renderPreview();
+        scheduleAutosave?.();
+      }
+    }
+
+    function insertAtCursor(id, text){
+      const ta = document.getElementById(id);
+      if (!ta) return;
+      const s = ta.selectionStart ?? ta.value.length;
+      const e = ta.selectionEnd ?? ta.value.length;
+      const needsNL = ta.value && s > 0 && text && !text.startsWith('\n') ? '\n' : '';
+      ta.value = ta.value.slice(0, s) + needsNL + text + ta.value.slice(e);
+      ta.focus();
+      const pos = ta.value.length;
+      ta.selectionStart = ta.selectionEnd = pos;
+      if (typeof renderPreview === 'function') renderPreview();
+      if (typeof scheduleAutosave === 'function') scheduleAutosave();
+    }
+    function insertChip(targetId, text){ insertAtCursor(targetId, text); }
+    function constraintsWizard() {
+      const perf = prompt(
+        'Performance budget? (e.g., "TTFB < 200ms; DB queries < 100ms; cache reads")',
+        'TTFB < 200ms; DB queries < 100ms; cache reads'
+      );
+      const sec = prompt(
+        'Security expectations? (e.g., "Nonce + capability checks; sanitize/escape; $wpdb->prepare")',
+        'Nonce + capability checks; sanitize/escape; $wpdb->prepare'
+      );
+      const comp = prompt(
+        'Compliance/privacy? (e.g., "No PII in logs; respect consent; redact user data in errors")',
+        'No PII in logs; respect consent; redact user data in errors'
+      );
+      const time = prompt(
+        'Time/Budget bounds? (e.g., "MVP in 6 hours; no paid APIs")',
+        'MVP in 6 hours; no paid APIs'
+      );
+      const rel = prompt(
+        'Reliability/observability? (e.g., "Log in AEST; error handling; retries/backoff")',
+        'Log in AEST; error handling; retries/backoff'
+      );
+
+      const lines = [];
+      if (perf) lines.push(`- Performance: ${perf}`);
+      if (sec)  lines.push(`- Security: ${sec}`);
+      if (comp) lines.push(`- Compliance: ${comp}`);
+      if (time) lines.push(`- Time/Budget: ${time}`);
+      if (rel)  lines.push(`- Reliability/Observability: ${rel}`);
+
+      if (lines.length) {
+        const block = (val('agent_constraints').trim() ? '\n' : '') + lines.join('\n');
+        insertAtCursor('agent_constraints', block);
+      }
+    }
+
+    // allow inline onclick to call it
+    window.constraintsWizard = constraintsWizard;
+    // make sure inline onclick="" can see them
+    window.insertAtCursor = insertAtCursor;
+    window.insertChip = window.insertChip || insertChip;
+
+    async function initTcreiTemplateSelectFromDB() {
+      const sel = $('templatePreset');
+      if (!sel) return 0;
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">— Loading templates… —</option>';
+
+      let count = 0;
       try {
-        DB_AGENT_TEMPLATES = await fetchTemplates('agent'); // { key -> {key,label,description,payload,...} }
+        DB_TCREI_TEMPLATES = await fetchTemplates('tcrei');
         sel.innerHTML = '';
+        const rows = Object.values(DB_TCREI_TEMPLATES)
+          .filter(t => t.is_active !== 0)
+          .sort((a,b)=> (a.sort_order - b.sort_order) || (a.label||'').localeCompare(b.label||''));
 
-        Object.values(DB_AGENT_TEMPLATES)
-          .sort((a,b)=> (a.sort_order - b.sort_order) || a.label.localeCompare(b.label))
-          .forEach(t => {
+        if (rows.length) {
+          rows.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t.key;
-            opt.textContent = t.label;
+            opt.textContent = t.label || t.key;
             sel.appendChild(opt);
           });
-
-        if (DB_AGENT_TEMPLATES['wordpress_programmer']) {
-          sel.value = 'wordpress_programmer';
-        } else if (sel.options.length) {
-          sel.selectedIndex = 0;
+          count = rows.length;
+        } else {
+          // fallback local presets
+          Object.entries(TCREI_FALLBACK_PRESETS).forEach(([key, obj]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = obj.label;
+            sel.appendChild(opt);
+          });
+          count = sel.options.length;
         }
 
-        // Change handler: prefill defaults and re-render
+        sel.onchange = () => applyTcreiTemplate(sel.value);
+        // don’t call apply here if you’re going to do it after both loads
+      } catch (e) {
+        showAlert('No TCREI templates found in DB — using local fallbacks.','warning');
+      } finally {
+        sel.disabled = false;
+      }
+      return count;
+    }
+
+    async function initAgentTemplateSelectFromDB() {
+      const sel = $('agentTemplate');
+      const desc = $('agentTemplateDesc');
+      if (!sel) return 0;
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">— Loading templates… —</option>';
+
+      let count = 0;
+      try {
+        DB_AGENT_TEMPLATES = await fetchTemplates('agent');
+        sel.innerHTML = '';
+        const rows = Object.values(DB_AGENT_TEMPLATES)
+          .sort((a,b)=> (a.sort_order - b.sort_order) || (a.label||'').localeCompare(b.label||''));
+
+        rows.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.key;
+          opt.textContent = t.label || t.key;
+          sel.appendChild(opt);
+        });
+        count = rows.length;
+
+        // selection is applied later after both dropdowns are ready
         sel.addEventListener('change', () => {
           applyAgentTemplate();
           renderPreview();
         });
-
-        // Initial apply
-        applyAgentTemplate();
-      } catch (err) {
-        console.error('Template load failed:', err);
-        // If you want a local fallback, define AGENT_TEMPLATES and populate sel here.
+      } catch (e) {
+        console.error('Agent templates load failed:', e);
+      } finally {
+        sel.disabled = false;
       }
+      return count;
     }
+
+    // ========= Generic Bootstrap modal builder =========
+    (function () {
+      const modalEl   = document.getElementById('wizardModal');
+      const formEl    = document.getElementById('wizardForm');
+      const titleEl   = document.getElementById('wizardModalTitle');
+      const bodyEl    = document.getElementById('wizardModalBody');
+      const bsModal   = new bootstrap.Modal(modalEl);
+      let submitHandler = null;
+
+      function fieldHtml(f) {
+        const id = `wiz_${f.id}`;
+        const help = f.help ? `<div class="form-text">${f.help}</div>` : '';
+        if (f.type === 'textarea') {
+          return `
+            <div class="mb-3">
+              <label class="form-label" for="${id}">${f.label}</label>
+              <textarea class="form-control" id="${id}" placeholder="${f.placeholder||''}" rows="${f.rows||3}">${f.value||''}</textarea>
+              ${help}
+            </div>`;
+        }
+        if (f.type === 'select') {
+          const opts = (f.options||[]).map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+          return `
+            <div class="mb-3">
+              <label class="form-label" for="${id}">${f.label}</label>
+              <select class="form-select" id="${id}">${opts}</select>
+              ${help}
+            </div>`;
+        }
+        if (f.type === 'checkbox') {
+          return `
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="${id}" ${f.checked?'checked':''}>
+              <label class="form-check-label" for="${id}">${f.label}</label>
+            </div>`;
+        }
+        // default: text
+        return `
+          <div class="mb-3">
+            <label class="form-label" for="${id}">${f.label}</label>
+            <input class="form-control" type="text" id="${id}" placeholder="${f.placeholder||''}" value="${f.value||''}">
+            ${help}
+          </div>`;
+      }
+
+      function collect(fields) {
+        const out = {};
+        for (const f of fields) {
+          const id = `wiz_${f.id}`;
+          const el = document.getElementById(id);
+          if (!el) continue;
+          if (f.type === 'checkbox') out[f.id] = !!el.checked;
+          else                       out[f.id] = el.value.trim();
+        }
+        return out;
+      }
+
+      window.openWizardModal = function openWizardModal({title, fields, onSubmit}) {
+        // build body
+        bodyEl.innerHTML = fields.map(fieldHtml).join('');
+        titleEl.textContent = title || 'Wizard';
+        submitHandler = () => onSubmit(collect(fields));
+        bsModal.show();
+      };
+
+      // One submit listener reused for all wizards
+      formEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        try {
+          submitHandler && submitHandler();
+          bsModal.hide();
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    })();
+
+    // ========= Agent wizards (use the generic modal) =========
+
+    // Objective
+    function objectiveWizard() {
+      openWizardModal({
+        title: 'Objective',
+        fields: [
+          { id:'verb',  label:'Action',      type:'select', options:[
+            {value:'Implement',label:'Implement'},
+            {value:'Fix',label:'Fix'},
+            {value:'Research',label:'Research'},
+            {value:'Migrate',label:'Migrate'}
+          ]},
+          { id:'thing', label:'Feature/Thing', placeholder:'e.g., admin action to resend renewal email' },
+          { id:'where', label:'Where/Context', placeholder:'e.g., Woo Memberships > User profile' },
+          { id:'why',   label:'Why (optional)', placeholder:'e.g., reduce support load and missed renewals' }
+        ],
+        onSubmit: ({verb,thing,where,why}) => {
+          const line = [verb||'Implement', thing||'feature', where ? `in ${where}` : '', why ? `to ${why}` : '']
+            .filter(Boolean).join(' ');
+          if (line) insertAtCursor('agent_objective', (val('agent_objective').trim() ? '\n' : '') + line);
+        }
+      });
+    }
+    window.objectiveWizard = objectiveWizard;
+
+    // Success Criteria
+    function successWizard() {
+      openWizardModal({
+        title: 'Success Criteria',
+        fields: [
+          { id:'ui',    label:'UI/State',   placeholder:'link shown under Next Bill On' },
+          { id:'email', label:'Side effect',placeholder:'correct template sent + logged' },
+          { id:'sec',   label:'Security',   placeholder:'nonce + capability checks' },
+          { id:'perf',  label:'Performance',placeholder:'page impact < 50ms' },
+          { id:'tests', label:'Tests',      placeholder:'unit/integration updated' }
+        ],
+        onSubmit: (d) => {
+          const lines = [];
+          if (d.ui)    lines.push(`- ${d.ui}`);
+          if (d.email) lines.push(`- ${d.email}`);
+          if (d.sec)   lines.push(`- ${d.sec}`);
+          if (d.perf)  lines.push(`- ${d.perf}`);
+          if (d.tests) lines.push(`- ${d.tests}`);
+          if (lines.length) insertAtCursor('agent_success', (val('agent_success').trim() ? '\n' : '') + lines.join('\n'));
+        }
+      });
+    }
+    window.successWizard = successWizard;
+
+    // Scope (in-scope)
+    function scopeWizard() {
+      openWizardModal({
+        title: 'Scope (In-Scope)',
+        fields: [
+          { id:'action',  label:'Action',      placeholder:'add admin link + handler' },
+          { id:'reuse',   label:'Reuse assets',placeholder:'reuse existing renewal template' },
+          { id:'logging', label:'Observability',placeholder:'log actor, user, time (AEST)' },
+          { id:'security',label:'Security',    placeholder:'nonce + capability checks; sanitize/escape' },
+          { id:'testing', label:'Testing',     placeholder:'unit/integration where practical' }
+        ],
+        onSubmit: (d) => {
+          const lines = [];
+          ['action','reuse','logging','security','testing'].forEach(k => d[k] && lines.push(`- ${d[k]}`));
+          if (lines.length) insertAtCursor('agent_scope', (val('agent_scope').trim() ? '\n' : '') + lines.join('\n'));
+        }
+      });
+    }
+    window.scopeWizard = scopeWizard;
+
+    // Out of Scope
+    function outOfScopeWizard() {
+      openWizardModal({
+        title: 'Out of Scope',
+        fields: [
+          { id:'email',    label:'Emails/templates', placeholder:'creating new email templates' },
+          { id:'db',       label:'DB/schema',        placeholder:'DB schema changes' },
+          { id:'payments', label:'Payments',         placeholder:'subscription proration logic' },
+          { id:'provider', label:'Providers',        placeholder:'switching payment provider' }
+        ],
+        onSubmit: (d) => {
+          const lines = [];
+          ['email','db','payments','provider'].forEach(k => d[k] && lines.push(`- ${d[k]}`));
+          if (lines.length) insertAtCursor('agent_outofscope', (val('agent_outofscope').trim() ? '\n' : '') + lines.join('\n'));
+        }
+      });
+    }
+    window.outOfScopeWizard = outOfScopeWizard;
+
+    // Environment
+    function envWizard() {
+      openWizardModal({
+        title: 'Environment Details',
+        fields: [
+          { id:'php',   label:'PHP',        placeholder:'8.2' },
+          { id:'wp',    label:'WordPress',  placeholder:'6.5+' },
+          { id:'woo',   label:'Woo/plugins',placeholder:'WooCommerce 8.x' },
+          { id:'local', label:'Local/dev',  placeholder:'Win11 (Local by Flywheel)' },
+          { id:'prod',  label:'Prod',       placeholder:'Flywheel (NGINX)' },
+          { id:'path',  label:'Plugin path',placeholder:'/wp-content/plugins/oi-mods/' },
+          { id:'tz',    label:'Timezone',   placeholder:'Australia/Brisbane (AEST; no DST)' }
+        ],
+        onSubmit: (d) => {
+          const lines = [];
+          if (d.php)   lines.push(`PHP ${d.php}`);
+          if (d.wp)    lines.push(`WordPress ${d.wp}`);
+          if (d.woo)   lines.push(d.woo);
+          if (d.local) lines.push(`Local: ${d.local}`);
+          if (d.prod)  lines.push(`Prod: ${d.prod}`);
+          if (d.path)  lines.push(`Plugin: ${d.path}`);
+          if (d.tz)    lines.push(`TZ: ${d.tz}`);
+          if (lines.length) insertAtCursor('agent_env', (val('agent_env').trim() ? '\n' : '') + lines.join('\n'));
+        }
+      });
+    }
+    window.envWizard = envWizard;
+
+    // Vendor Docs
+    function vendorWizard() {
+      openWizardModal({
+        title: 'Vendor Docs',
+        fields: [
+          { id:'wp',     type:'checkbox', label:'WordPress Developer Docs (core)', checked:true },
+          { id:'wc',     type:'checkbox', label:'WooCommerce Memberships Docs',    checked:true },
+          { id:'ff',     type:'checkbox', label:'Formidable Forms Developer Docs' },
+          { id:'stripe', type:'checkbox', label:'Stripe API Docs (Billing/Invoices)' },
+          { id:'host',   type:'checkbox', label:'Flywheel Platform Docs' },
+          { id:'extra',  type:'textarea', label:'Other (one per line)', rows:4, placeholder:'e.g., Mailgun API Docs\nWP-CLI Commands' }
+        ],
+        onSubmit: (d) => {
+          const lines = [];
+          if (d.wp)     lines.push('- WordPress Developer Docs');
+          if (d.wc)     lines.push('- WooCommerce Memberships Docs');
+          if (d.ff)     lines.push('- Formidable Forms Developer Docs');
+          if (d.stripe) lines.push('- Stripe API Docs (Billing/Invoices)');
+          if (d.host)   lines.push('- Flywheel Platform Docs');
+          if (d.extra)  d.extra.split('\n').map(s=>s.trim()).filter(Boolean).forEach(s => lines.push(`- ${s}`));
+          if (lines.length) insertAtCursor('agent_extra_sources', (val('agent_extra_sources').trim() ? '\n' : '') + lines.join('\n'));
+        }
+      });
+    }
+    window.vendorWizard = vendorWizard;
 
     function applyAgentTemplate() {
       const sel = document.getElementById('agentTemplate');
@@ -726,103 +1240,130 @@
       setIfEmpty('agent_constraints', d.constraints);
     }
     function showAlert(message,type='success'){const b=document.getElementById('alert-banner');const m=document.getElementById('alert-message');b.className='alert';b.classList.add(type);m.innerHTML=message;b.style.display='block';b.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{b.style.display='none';},5000);}
-    function normalizeInput(text){return (text||'').trim().replace(/\n{2,}/g,'\n');}
-function buildAgentObj() {
-  if (document.getElementById('methodSelector').value !== 'agent') return { text: '' };
+    function normalizeInput(text){return (text||'').trim().replace(/\n{2,}/g,'\n');}   
+    function buildAgentObj() {
+      if (document.getElementById('methodSelector').value !== 'agent') return { text: '' };
 
-  // Which template?
-  const tplKey = (document.getElementById('agentTemplate')?.value) || 'wordpress_programmer';
-  const tplRow = DB_AGENT_TEMPLATES[tplKey];
-  const p = tplRow?.payload || {};
+      // Which template?
+      const tplKey = (document.getElementById('agentTemplate')?.value) || 'wordpress_programmer';
+      const tplRow = DB_AGENT_TEMPLATES[tplKey];
+      const p = tplRow?.payload || {};
 
-  // Gather user inputs
-  const normalize = normalizeInput;
-  const objective    = normalize(document.getElementById('agent_objective').value);
-  const success      = normalize(document.getElementById('agent_success').value);
-  const scope        = normalize(document.getElementById('agent_scope').value);
-  const outofscope   = normalize(document.getElementById('agent_outofscope').value);
-  const constraints  = normalize(document.getElementById('agent_constraints').value);
-  const env          = normalize(document.getElementById('agent_env').value);
-  const extraVendors = normalize(document.getElementById('agent_extra_sources').value);
+      // Gather user inputs
+      const normalize = normalizeInput;
+      const objective    = normalize(document.getElementById('agent_objective').value);
+      const success      = normalize(document.getElementById('agent_success').value);
+      const scope        = normalize(document.getElementById('agent_scope').value);
+      const outofscope   = normalize(document.getElementById('agent_outofscope').value);
+      const constraints  = normalize(document.getElementById('agent_constraints').value);
+      const env          = normalize(document.getElementById('agent_env').value);
+      const extraVendors = normalize(document.getElementById('agent_extra_sources').value);
 
-  // Helpers
-  const bullet = (arr, prefix = '-') =>
-    (Array.isArray(arr) && arr.length) ? arr.map(x => `${prefix} ${x}`).join('\n') : '';
+      // Helpers
+      const bullet = (arr, prefix = '-') =>
+        (Array.isArray(arr) && arr.length) ? arr.map(x => `${prefix} ${x}`).join('\n') : '';
 
-  const numbered = (arr) =>
-    (Array.isArray(arr) && arr.length) ? arr.map((x,i)=> `${i+1}) ${x}`).join('\n') : '';
+      const numbered = (arr) =>
+        (Array.isArray(arr) && arr.length) ? arr.map((x,i)=> `${i+1}) ${x}`).join('\n') : '';
 
-  const section = (title, body) => body ? `${title}\n${body}` : '';
+      const section = (title, body) => body ? `${title}\n${body}` : '';
 
-  // Sections from template
-  const roleGoal      = p.roleGoal ? `ROLE & GOAL\n${p.roleGoal}` : '';
-  const contextBlock  = section('CONTEXT', bullet(p.context));
-  const sourcesBlock  = section('SOURCE PRIORITY', numbered(
-    extraVendors ? [...(p.sources||[]), extraVendors] : (p.sources||[])
-  ));
-  const workflowBlock = section('WORKFLOW', numbered(p.workflow));
+      // Sections from template
+      const roleGoal      = p.roleGoal ? `ROLE & GOAL\n${p.roleGoal}` : '';
+      const contextBlock  = section('CONTEXT', bullet(p.context));
+      const sourcesBlock  = section('SOURCE PRIORITY', numbered(
+        extraVendors ? [...(p.sources||[]), extraVendors] : (p.sources||[])
+      ));
+      const workflowBlock = section('WORKFLOW', numbered(p.workflow));
 
-  // Output clusters
-  const fmt  = bullet(p.output?.format);
-  const qual = bullet(p.output?.quality);
-  const conf = bullet(p.output?.confirm);
+      // Output clusters
+      const fmt  = bullet(p.output?.format);
+      const qual = bullet(p.output?.quality);
+      const conf = bullet(p.output?.confirm);
 
-  const outputBlock =
-    [
-      section('OUTPUT FORMAT', fmt),
-      section('QUALITY BARS',  qual),
-      section('CONFIRMATION BREAKPOINTS', conf)
-    ].filter(Boolean).join('\n\n');
+      const outputBlock =
+        [
+          section('OUTPUT FORMAT', fmt),
+          section('QUALITY BARS',  qual),
+          section('CONFIRMATION BREAKPOINTS', conf)
+        ].filter(Boolean).join('\n\n');
 
-  // User TASK section (always included)
-  const taskBlock = `TASK
-- Objective: ${objective || '{{what to achieve}}'}
-- Success criteria: ${success || '{{measurable outcomes}}'}
-- Scope / Out of scope:
-${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscope}` : ''}
-- Constraints: ${constraints || '{{perf, security, compliance, time, budget}}'}
-- Environment details: ${env || '{{versions, tools, paths}}'}`;
+      // User TASK section (always included)
+      const taskBlock = `TASK
+    - Objective: ${objective || '{{what to achieve}}'}
+    - Success criteria: ${success || '{{measurable outcomes}}'}
+    - Scope / Out of scope:
+    ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscope}` : ''}
+    - Constraints: ${constraints || '{{perf, security, compliance, time, budget}}'}
+    - Environment details: ${env || '{{versions, tools, paths}}'}`;
 
-  // Tools & Actions: from template if provided, else a sane default
-  const toolsBlock = p.toolsActions
-    ? section('TOOLS & ACTIONS', bullet(p.toolsActions))
-    : `TOOLS & ACTIONS
-- You may browse the web, read/place files, and create artifacts. For high-impact changes (security, data loss risk), PAUSE and request confirmation before acting.
-- Prefer these source types, in order: vendor/official docs; standards bodies; original blog posts/release notes; well-established community docs. Provide inline citations and a short **Sources** section.`;
+      // Tools & Actions: from template if provided, else a sane default
+      const toolsBlock = p.toolsActions
+        ? section('TOOLS & ACTIONS', bullet(p.toolsActions))
+        : `TOOLS & ACTIONS
+    - You may browse the web, read/place files, and create artifacts. For high-impact changes (security, data loss risk), PAUSE and request confirmation before acting.
+    - Prefer these source types, in order: vendor/official docs; standards bodies; original blog posts/release notes; well-established community docs. Provide inline citations and a short **Sources** section.`;
 
-  // Compose only non-empty parts
-  const text = [
-    roleGoal,
-    contextBlock,
-    taskBlock,
-    toolsBlock,
-    sourcesBlock,
-    workflowBlock,
-    outputBlock
-  ].filter(Boolean).join('\n\n');
+      // Compose only non-empty parts
+      const text = [
+        roleGoal,
+        contextBlock,
+        taskBlock,
+        toolsBlock,
+        sourcesBlock,
+        workflowBlock,
+        outputBlock
+      ].filter(Boolean).join('\n\n');
 
-  return {
-    text,
-    template_key: tplKey,
-    objective, success, scope, outofscope, constraints, env, extraVendors
-  };
-}
+      return {
+        text,
+        template_key: tplKey,
+        objective, success, scope, outofscope, constraints, env, extraVendors
+      };
+    }
 
+        // ---- AGENT linter ----
+    function isPlaceholder(s) {
+      const x = (s || '').trim();
+      return (
+        !x ||
+        /\{\{[^}]+\}\}/.test(x) ||  // e.g., {{perf, security…}}
+        /^(tbd|n\/?a|\?+)$/i.test(x)
+      );
+    }
 
-    // ---- AGENT linter ----
     function lintAgent(obj) {
       const issues = [];
-      if (!obj.objective?.trim())     issues.push('No objective.');
-      if (!obj.success?.trim())       issues.push('No success criteria.');
+      const hasBullets = s => /(^|\n)\s*-\s+/m.test(s || '');
+
+      if (!obj.objective?.trim()) issues.push('No objective.');
+      if (!obj.success?.trim())   issues.push('No success criteria.');
+      else {
+        // nudge: success should be measurable
+        if (!/[<>=]|%|\b(ms|s|minutes?|hours?)\b|\b(pass|fail|green)\b/i.test(obj.success)) {
+          issues.push('Success: add measurable checks (e.g., “impact < 50ms”, "%”, pass/fail).');
+        }
+        if (!hasBullets(obj.success)) issues.push('Success: use bullet points for scanability.');
+      }
+
       if (!obj.scope?.trim() && !obj.outofscope?.trim()) issues.push('No scope / out-of-scope.');
-      if (!obj.env?.trim())           issues.push('No environment details.');
-      if (/\b(nice|cool|good|things|stuff)\b/i.test(obj.text)) issues.push('Ambiguous wording detected — be precise.');
+      if (obj.scope && !hasBullets(obj.scope)) issues.push('Scope: prefer bullet list.');
+      if (obj.outofscope && !hasBullets(obj.outofscope)) issues.push('Out of scope: prefer bullet list.');
+
+      if (!obj.env?.trim()) issues.push('No environment details.');
+
+      // Constraints checks (from previous message)
+      const rawC = (obj.constraints || '').trim();
+      if (isPlaceholder(rawC)) {
+        issues.push('No constraints provided (perf, security, compliance, time/budget).');
+      }
+      if (/\b(nice|cool|good|things|stuff)\b/i.test(obj.text)) {
+        issues.push('Ambiguous wording detected — be precise.');
+      }
       return issues;
     }
     function clearFormFields(){document.querySelectorAll('textarea').forEach(t=>t.value='');document.getElementById('tcrei_add_tags').checked=false;lastRestoredPromptData=null;renderPreview();}
-
     function deepEqual(a,b){if(a===b)return true;if(a==null||typeof a!='object'||b==null||typeof b!='object')return false;const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;for(const k of ka){if(!kb.includes(k)||!deepEqual(a[k],b[k]))return false}return true}
-
     async function generatePromptAndSave(method){
       let combinedPrompt = '';
       let promptData = { method };
@@ -1116,64 +1657,150 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
       }
     };
 
-    // ---------- Enhancements: chips, presets, variables, linter, tokens, preview, autosave, A/B, import/export, shortcuts ----------
-    function insertAtCursor(id,text){const ta=document.getElementById(id); if(!ta) return; const s=ta.selectionStart??ta.value.length; const e=ta.selectionEnd??ta.value.length;
-      ta.value = ta.value.slice(0,s) + (ta.value && s>0 && text && !text.startsWith('\n') ? '\n'+text : text) + ta.value.slice(e);
-      ta.focus(); const pos=(ta.value.length); ta.selectionStart=ta.selectionEnd=pos; renderPreview(); scheduleAutosave();
-    }
-    function insertChip(targetId,text){insertAtCursor(targetId,text);}
-    function taHasText(id){return ((document.getElementById(id)?.value)||'').trim().length>0;}
-
-    const PRESETS={
-      blog:{task:"Write a blog post explaining {{topic}} to {{audience}}.",format:"Formatted in Markdown. Use headings, short paragraphs, and bullet lists where helpful.",context:"Tone: {{tone}}. Length: {{length}}. Include 3 real-world examples and a brief conclusion.",references:"",iterate:"Critique for clarity, remove redundancy, add a concise summary at the end."},
-      product:{task:"Create a compelling product description for {{topic}}.",format:"Markdown with intro, bullet features, and benefits section.",context:"Audience: {{audience}}. Tone: {{tone}}. Length: {{length}}.",references:"Use brand style guide where applicable.",iterate:"Tighten copy; emphasise benefits; add a persuasive CTA."},
-      email:{task:"Write an email campaign introducing {{topic}} to {{audience}}.",format:"Subject + preview + body (short paragraphs + bullets).",context:"Tone: {{tone}}. Keep it concise. One strong CTA.",references:"",iterate:"A/B test two subject lines and two CTAs."},
-      bug:{task:"Draft a clear bug report.",format:"Sections: Summary, Steps, Expected, Actual, Environment, Screenshots.",context:"Audience: engineering. Be precise; avoid ambiguity.",references:"",iterate:"Ensure steps are minimal yet reproducible."}
-    };
-    function applyTemplate(k){if(!k||!PRESETS[k])return; const p=PRESETS[k];
-      document.getElementById('tcrei_task').value=p.task; document.getElementById('tcrei_format').value=p.format; document.getElementById('tcrei_context').value=p.context;
-      document.getElementById('tcrei_references').value=p.references; document.getElementById('tcrei_iterate').value=p.iterate; renderPreview(); scheduleAutosave();
-    }
-
     function withVariables(text){
-      const rep={'{{audience}}':document.getElementById('varAudience').value||'',
-                 '{{tone}}':document.getElementById('varTone').value||'',
-                 '{{length}}':document.getElementById('varLength').value||'',
-                 '{{topic}}':'your topic'};
-      return Object.keys(rep).reduce((acc,k)=>acc.split(k).join(rep[k]),text||'');
+      const rep = {
+        '{{audience}}': val('varAudience') || '',
+        '{{tone}}':     val('varTone')     || '',
+        '{{length}}':   val('varLength')   || '',
+        '{{topic}}':    'your topic'
+      };
+      return Object.keys(rep).reduce((acc,k)=>acc.split(k).join(rep[k]), text||'');
     }
 
-    function lintPrompt(obj){
-      const issues=[]; const t=[obj.task,obj.format,obj.context,obj.references,obj.iterate].filter(Boolean).join(' ');
-      if(!obj.task?.trim()) issues.push('No task provided.');
-      if(!/Audience:/i.test(obj.context||'') && !/{{audience}}/.test(t)) issues.push('No audience specified.');
-      if(!/Length:/i.test(obj.context||'') && !/{{length}}/.test(t)) issues.push('No length guidance.');
-      if((t.match(/\b(very|really|stuff|things)\b/gi)||[]).length>3) issues.push('Ambiguous words detected (very/really/stuff/things).');
-      if((t.match(/\band also\b/gi)||[]).length>0) issues.push('Redundant phrase: "and also".');
-      return issues;
-    }
+function lintPrompt(obj){
+  const issues = [];
+  const t = [obj.task, obj.format, obj.context, obj.references, obj.iterate]
+              .filter(Boolean).join(' ');
+
+  const audienceVar = val('varAudience').trim();
+  const lengthVar   = val('varLength').trim();
+  const toneVar     = val('varTone').trim();
+
+  const hasAudience =
+    audienceVar.length > 0 ||
+    /Audience:\s*[^\s{}]/i.test(t);
+
+  const hasLength =
+    lengthVar.length > 0 ||
+    /Length:\s*[^\s{}]/i.test(t) ||
+    /\b~?\d+\s*(words?|chars?|tokens?)\b/i.test(t);
+
+  const hasTone =
+    toneVar.length > 0 ||
+    /Tone:\s*[^\s{}]/i.test(t);
+
+  if (!obj.task?.trim()) issues.push('No task provided.');
+  if (!hasAudience)       issues.push('No audience specified.');
+  if (!hasLength)         issues.push('No length guidance.');
+  if (!hasTone)           issues.push('No tone specified.');
+
+  if ((t.match(/\b(very|really|stuff|things)\b/gi)||[]).length > 3)
+    issues.push('Ambiguous words detected (very/really/stuff/things).');
+  if ((t.match(/\band also\b/gi)||[]).length > 0)
+    issues.push('Redundant phrase: "and also".');
+
+  return issues;
+}
 
     function estimateTokens(s){const chars=(s||'').length; const words=(s||'').trim().split(/\s+/).filter(Boolean).length; const a=Math.ceil(chars/4), b=Math.ceil(words/0.75); return Math.round((a+b)/2);}
+    function ensureVarsInContext(ctx){
+      const a = val('varAudience').trim();
+      const t = val('varTone').trim();
+      const l = val('varLength').trim();
 
-    function buildPromptObj(){
-      if(document.getElementById('methodSelector').value!=='tcrei') return {text:''};
-      const addTags=document.getElementById('tcrei_add_tags').checked;
-      const mode=document.getElementById('modeSelector').value;
-      let task=withVariables(normalizeInput(document.getElementById('tcrei_task').value));
-      let format=withVariables(normalizeInput(document.getElementById('tcrei_format').value));
-      let context=withVariables(normalizeInput(document.getElementById('tcrei_context').value));
-      let references=withVariables(normalizeInput(document.getElementById('tcrei_references').value));
-      let iterate=withVariables(normalizeInput(document.getElementById('tcrei_iterate').value));
-      if(iterate){iterate=`Before finalising, critique your own draft against these criteria, then revise:\n${iterate}`;}
-      let modeHint=''; if(mode==='concise')modeHint='Please keep the response concise and to the point.'; if(mode==='creative')modeHint='Embrace creativity and original turns of phrase.'; if(mode==='factual')modeHint='Be strictly factual and cite sources where possible.';
-      if(addTags){
-        const blocks=[]; if(task)blocks.push(`<task>${task}</task>`); if(format)blocks.push(`<format>${format}</format>`); if(context)blocks.push(`<context>${context}</context>`); if(references)blocks.push(`<references>${references}</references>`); if(iterate)blocks.push(`<revise>${iterate}</revise>`); if(modeHint)blocks.push(`<mode>${modeHint}</mode>`);
-        return {addTags:true,text:blocks.join('\n'),task,format,context,references,iterate};
-      }else{
-        const parts=[]; if(task)parts.push(task); if(format)parts.push(format); if(context)parts.push(context); if(references)parts.push(references); if(iterate)parts.push(`Revise with:\n${iterate}`); if(modeHint)parts.push(modeHint);
-        return {addTags:false,text:parts.join(' '),task,format,context,references,iterate};
+      const add = [];
+      if (!/Audience:/i.test(ctx) && a) add.push(`Audience: ${a}`);
+      if (!/Tone:/i.test(ctx)     && t) add.push(`Tone: ${t}`);
+      if (!/Length:/i.test(ctx)   && l) add.push(`Length: ${l}`);
+
+      if (add.length) {
+        ctx = (ctx ? ctx + '\n' : '') + add.join('\n');
       }
+      return ctx;
     }
+    function ensureVarsInContext(ctx){
+      const a = val('varAudience').trim();
+      const t = val('varTone').trim();
+      const l = val('varLength').trim();
+
+      const add = [];
+      if (!/Audience:/i.test(ctx) && a) add.push(`Audience: ${a}`);
+      if (!/Tone:/i.test(ctx)     && t) add.push(`Tone: ${t}`);
+      if (!/Length:/i.test(ctx)   && l) add.push(`Length: ${l}`);
+
+      if (add.length) ctx = (ctx ? ctx + '\n' : '') + add.join('\n');
+      return ctx;
+    }
+    function stripContextLabels(ctx) {
+      ctx = (ctx || '');
+      const lines = ctx.split(/\r?\n/).filter(line => !/^\s*(Audience|Tone|Length)\s*:/i.test(line));
+      return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+  // Always override those labels with the side inputs (only add if non-empty)
+  function ensureVarsInContext(ctx){
+    const a = val('varAudience').trim();
+    const t = val('varTone').trim();
+    const l = val('varLength').trim();
+
+    ctx = stripContextLabels(ctx);
+
+    const add = [];
+    if (a) add.push(`Audience: ${a}`);
+    if (t) add.push(`Tone: ${t}`);
+    if (l) add.push(`Length: ${l}`);
+
+    if (add.length) ctx = (ctx ? ctx + '\n' : '') + add.join('\n');
+    return ctx;
+  }
+
+function buildPromptObj(){
+  const methodSel = document.getElementById('methodSelector');
+  if (!methodSel || methodSel.value !== 'tcrei') return { text: '' };
+
+  const addTags = !!document.getElementById('tcrei_add_tags')?.checked;
+  const mode    = document.getElementById('modeSelector')?.value || '';
+
+  const get = (id) => (document.getElementById(id)?.value || '').trim();
+  const W   = (s) => withVariables(s); // keep your existing function
+
+  let task       = W(get('tcrei_task'));
+  let format     = W(get('tcrei_format'));
+  let context = W(get('tcrei_context'));
+  context = ensureVarsInContext(context);
+  let references = W(get('tcrei_references'));
+  let iterate    = W(get('tcrei_iterate'));
+
+  if (iterate) {
+    iterate = `Before finalising, critique your own draft against these criteria, then revise:\n${iterate}`;
+  }
+
+  let modeHint = '';
+  if (mode === 'concise')  modeHint = 'Please keep the response concise and to the point.';
+  if (mode === 'creative') modeHint = 'Embrace creativity and original turns of phrase.';
+  if (mode === 'factual')  modeHint = 'Be strictly factual and cite sources where possible.';
+
+  if (addTags) {
+    const blocks = [];
+    if (task)       blocks.push(`<task>${task}</task>`);
+    if (format)     blocks.push(`<format>${format}</format>`);
+    if (context)    blocks.push(`<context>${context}</context>`);
+    if (references) blocks.push(`<references>${references}</references>`);
+    if (iterate)    blocks.push(`<revise>${iterate}</revise>`);
+    if (modeHint)   blocks.push(`<mode>${modeHint}</mode>`);
+    return { addTags:true, text: blocks.join('\n'), task, format, context, references, iterate };
+  } else {
+    const parts = [];
+    if (task)       parts.push(task);
+    if (format)     parts.push(format);
+    if (context)    parts.push(context);
+    if (references) parts.push(references);
+    if (iterate)    parts.push(`Revise with:\n${iterate}`);
+    if (modeHint)   parts.push(modeHint);
+    return { addTags:false, text: parts.join(' '), task, format, context, references, iterate };
+  }
+}
+
  function renderPreview() {
     const live = document.getElementById('livePreview');
     const lint = document.getElementById('linter');
@@ -1190,7 +1817,7 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
 
     let obj = { text: '' }, issues = [];
     if (method === 'tcrei') {
-      obj = buildPromptObj();
+      obj = buildPromptObj(); // now null-safe
       issues = lintPrompt(obj);
     } else if (method === 'design') {
       obj = buildDesignObj();
@@ -1231,57 +1858,84 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
     ]};
     function randomiseField(id,key){const arr=RANDOM_SETS[key]||[]; if(!arr.length)return; const choice=arr[Math.floor(Math.random()*arr.length)]; document.getElementById(id).value=choice; renderPreview(); scheduleAutosave();}
 
-    const DRAFT_KEY='prompt_draft_v1'; let autosaveTimer=null;
-    function scheduleAutosave(){const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: typing…'; clearTimeout(autosaveTimer); autosaveTimer=setTimeout(saveDraft,600);}
-    function currentPromptData(){
-      const method = document.getElementById('methodSelector').value;
+    const DRAFT_KEY = 'prompt_draft_v1';
+    if (window.__autosaveTimer === undefined) window.__autosaveTimer = null;
+
+    function scheduleAutosave() {
+      const b = $('autosaveStatus');
+      if (b) b.textContent = 'Autosave: typing…';
+      if (window.__autosaveTimer) clearTimeout(window.__autosaveTimer);
+      window.__autosaveTimer = setTimeout(saveDraft, 600);
+    }
+    function currentPromptData() {
+      const method = $('methodSelector')?.value || 'tcrei';
+
       if (method === 'tcrei') {
+        // Only read if the TCREI nodes exist
         return {
           method,
-          task:document.getElementById('tcrei_task').value,
-          format:document.getElementById('tcrei_format').value,
-          context:document.getElementById('tcrei_context').value,
-          references:document.getElementById('tcrei_references').value,
-          iterate:document.getElementById('tcrei_iterate').value,
-          addTags:document.getElementById('tcrei_add_tags').checked,
-          vars:{
-            audience:document.getElementById('varAudience').value,
-            tone:document.getElementById('varTone').value,
-            length:document.getElementById('varLength').value
+          task:        val('tcrei_task'),
+          format:      val('tcrei_format'),
+          context:     val('tcrei_context'),
+          references:  val('tcrei_references'),
+          iterate:     val('tcrei_iterate'),
+          addTags:     checked('tcrei_add_tags'),
+          vars: {
+            audience:  val('varAudience'),
+            tone:      val('varTone'),
+            length:    val('varLength')
           },
-          mode:document.getElementById('modeSelector').value
-        };
-      } else if (method === 'design') {
-        return {
-          method,
-          description:document.getElementById('design_description').value,
-          environment:document.getElementById('design_environment').value,
-          style:document.getElementById('design_style').value,
-          illumination:document.getElementById('design_illumination').value,
-          gradation:document.getElementById('design_gradation').value,
-          nuances:document.getElementById('design_nuances').value,
-          references:document.getElementById('design_references').value
-        };
-      } else if (method === 'agent') {
-        return {
-          method,
-          objective:document.getElementById('agent_objective').value,
-          success:document.getElementById('agent_success').value,
-          scope:document.getElementById('agent_scope').value,
-          outofscope:document.getElementById('agent_outofscope').value,
-          constraints:document.getElementById('agent_constraints').value,
-          env:document.getElementById('agent_env').value,
-          extraVendors:document.getElementById('agent_extra_sources').value
+          mode:        val('modeSelector')
         };
       }
+
+      if (method === 'design') {
+        return {
+          method,
+          description: val('design_description'),
+          environment: val('design_environment'),
+          style:       val('design_style'),
+          illumination:val('design_illumination'),
+          gradation:   val('design_gradation'),
+          nuances:     val('design_nuances'),
+          references:  val('design_references')
+        };
+      }
+
+      if (method === 'agent') {
+        return {
+          method,
+          objective:    val('agent_objective'),
+          success:      val('agent_success'),
+          scope:        val('agent_scope'),
+          outofscope:   val('agent_outofscope'),
+          constraints:  val('agent_constraints'),
+          env:          val('agent_env'),
+          extraVendors: val('agent_extra_sources'),
+          // keep template_key elsewhere if you store it
+        };
+      }
+
+      // Fallback
       return { method };
     }
 
+
     // Add the agent IDs to the listeners registration array: 
-    function saveDraft(){localStorage.setItem(DRAFT_KEY,JSON.stringify(currentPromptData())); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: saved';}
+    function saveDraft(){
+      const data = currentPromptData(); // now null-safe
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+        setAutosaveStatus('saved','Autosave: saved');
+        const b = $('autosaveStatus');
+        if (b) b.textContent = 'Autosave: saved';
+      } catch (e) {
+        console.warn('Autosave failed:', e);
+      }
+    }
     function restoreDraft(){const raw=localStorage.getItem(DRAFT_KEY); if(!raw){showAlert('No draft found.','info');return;} const d=JSON.parse(raw);
       if(d.method==='tcrei'){document.getElementById('tcrei_task').value=d.task||'';document.getElementById('tcrei_format').value=d.format||'';document.getElementById('tcrei_context').value=d.context||'';document.getElementById('tcrei_references').value=d.references||'';document.getElementById('tcrei_iterate').value=d.iterate||'';document.getElementById('tcrei_add_tags').checked=!!d.addTags;document.getElementById('varAudience').value=d.vars?.audience||'';document.getElementById('varTone').value=d.vars?.tone||'';document.getElementById('varLength').value=d.vars?.length||'';document.getElementById('modeSelector').value=d.mode||'';renderPreview();showAlert('Draft restored.','success');}}
-    function clearDraft(){localStorage.removeItem(DRAFT_KEY); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: cleared';}
+    function clearDraft(){localStorage.removeItem(DRAFT_KEY); setAutosaveStatus('clear','Autosave: cleared'); const b=document.getElementById('autosaveStatus'); if(b) b.textContent='Autosave: cleared';}
     [
       'tcrei_task','tcrei_format','tcrei_context','tcrei_references','tcrei_iterate','tcrei_add_tags',
         'design_description','design_environment','design_style','design_illumination','design_gradation','design_nuances','design_references',
@@ -1307,67 +1961,102 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
       catch(err){showAlert('Import failed: '+err.message,'error');}}; r.readAsText(f);}
 
     document.addEventListener('keydown',e=>{const cmd=e.metaKey||e.ctrlKey; if(!cmd)return; if(e.key.toLowerCase()==='enter'){e.preventDefault(); generatePromptAndSave('tcrei');} if(e.key.toLowerCase()==='k'){e.preventDefault(); clearFormFields(); renderPreview();} if(e.key==='/'){e.preventDefault(); document.querySelectorAll('.tooltiptext').forEach(tt=>{tt.style.visibility=(tt.style.visibility==='visible')?'hidden':'visible'; tt.style.opacity=(tt.style.opacity==='1')?'0':'1';});}});
+    // --- top-level (once) ---
+    let __APP_INITIALIZED__ = false;          // per-navigation guard
 
-        document.addEventListener('DOMContentLoaded', () => {
-          initAgentTemplateSelectFromDB();
-          showMethodFields();
-          toggleTemplateVisibility();          
-          showMethodFields();
-          document.getElementById('searchResultsContainer').innerHTML =
-            '<p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>';
-          document.getElementById('clearAllDbPrompts').style.display = 'none';
-          updatePaginationControls();
+    // Optional: “first time ever” (cross-session) flag
+    function markFirstRunOnce(){
+      const key = '__gpc_first_run__';
+      const firstRun = !localStorage.getItem(key);
+      if (firstRun){
+        localStorage.setItem(key, '1');
+        // You could show a one-time tip here if you want.
+      }
+      return firstRun;
+    }
 
-          // OPTIONAL: restore prior search preferences
-          const prefs = JSON.parse(localStorage.getItem('search_prefs') || '{}');
-          if (prefs.type)  document.getElementById('searchPromptType').value = prefs.type;
-          if (prefs.kw)    document.getElementById('searchKeyword').value   = prefs.kw;
-          if (prefs.by)    document.getElementById('searchSortBy').value    = prefs.by;
-          if (prefs.dir)   document.getElementById('searchSortDir').value   = prefs.dir;
-          if (prefs.mode)  document.getElementById('searchMode').value      = prefs.mode;
-          if (prefs.del)   document.getElementById('includeDeleted').checked = !!prefs.del;
+    // Single init for the whole app
+    async function initAppOnce(){
+      if (__APP_INITIALIZED__) return;
+      __APP_INITIALIZED__ = true;
 
-          // Save prefs whenever controls change
-          ['searchPromptType','searchKeyword','searchSortBy','searchSortDir','searchMode','includeDeleted']
-            .forEach(id => {
-              const el = document.getElementById(id);
-              if (!el) return;
-              el.addEventListener('change', () => {
-                localStorage.setItem('search_prefs', JSON.stringify({
-                  type: document.getElementById('searchPromptType').value,
-                  kw:   document.getElementById('searchKeyword').value,
-                  by:   document.getElementById('searchSortBy').value,
-                  dir:  document.getElementById('searchSortDir').value,
-                  mode: document.getElementById('searchMode').value,
-                  del:  document.getElementById('includeDeleted').checked ? 1 : 0
-                }));
-              });
-            });
+      setAutosaveStatus('idle','Autosave: idle');
+
+      await initAgentTemplateSelectFromDB();
+      await initTcreiTemplateSelectFromDB();
+
+      showMethodFields();
+      toggleTemplateVisibility();
+      // Search UI defaults
+      document.getElementById('searchResultsContainer').innerHTML =
+        '<p class="no-prompts-message">Search results will appear here. Use "List All Prompts" to see all saved entries.</p>';
+      document.getElementById('clearAllDbPrompts').style.display = 'none';
+      updatePaginationControls();
+
+      // Restore prior search preferences
+      const prefs = JSON.parse(localStorage.getItem('search_prefs') || '{}');
+      if (prefs.type)  document.getElementById('searchPromptType').value = prefs.type;
+      if (prefs.kw)    document.getElementById('searchKeyword').value   = prefs.kw;
+      if (prefs.by)    document.getElementById('searchSortBy').value    = prefs.by;
+      if (prefs.dir)   document.getElementById('searchSortDir').value   = prefs.dir;
+      if (prefs.mode)  document.getElementById('searchMode').value      = prefs.mode;
+      if (prefs.del)   document.getElementById('includeDeleted').checked = !!prefs.del;
+
+      // Persist any changes to the search controls
+      ['searchPromptType','searchKeyword','searchSortBy','searchSortDir','searchMode','includeDeleted']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener('change', () => {
+            localStorage.setItem('search_prefs', JSON.stringify({
+              type: document.getElementById('searchPromptType').value,
+              kw:   document.getElementById('searchKeyword').value,
+              by:   document.getElementById('searchSortBy').value,
+              dir:  document.getElementById('searchSortDir').value,
+              mode: document.getElementById('searchMode').value,
+              del:  document.getElementById('includeDeleted').checked ? 1 : 0
+            }));
+          });
         });
 
+      setTimeout(() => { renderPreview(); }, 0);
+
+        // sanity logs
+        console.log('TCREI options:', document.getElementById('templatePreset')?.options.length);
+        console.log('AGENT options:', document.getElementById('agentTemplate')?.options.length);
+      }
+
+    // ONE listener only
+    document.addEventListener('DOMContentLoaded', initAppOnce);
+
+    // If script might be injected late or re-run, also protect with:
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      initAppOnce();
+    }
     // --- DESIGN builder ---
     function buildDesignObj() {
       if (document.getElementById('methodSelector').value !== 'design') return { text: '' };
 
-      const description = normalizeInput(document.getElementById('design_description').value);
-      const environment = normalizeInput(document.getElementById('design_environment').value);
-      const style       = normalizeInput(document.getElementById('design_style').value);
-      const illumination= normalizeInput(document.getElementById('design_illumination').value);
-      const gradation   = normalizeInput(document.getElementById('design_gradation').value);
-      const nuances     = normalizeInput(document.getElementById('design_nuances').value);
-      const references  = normalizeInput(document.getElementById('design_references').value);
+      const description  = normalizeInput(document.getElementById('design_description').value);
+      const environment  = normalizeInput(document.getElementById('design_environment').value);
+      const style        = normalizeInput(document.getElementById('design_style').value);
+      const illumination = normalizeInput(document.getElementById('design_illumination').value);
+      const gradation    = normalizeInput(document.getElementById('design_gradation').value);
+      const nuances      = normalizeInput(document.getElementById('design_nuances').value);
+      const references   = normalizeInput(document.getElementById('design_references').value);
 
-      const parts = [];
-      if (description)  parts.push(description);
-      if (environment)  parts.push(environment);
-      if (style)        parts.push(style);
-      if (illumination) parts.push(illumination);
-      if (gradation)    parts.push(gradation);
-      if (nuances)      parts.push(nuances);
-      if (references)   parts.push(references);
+      // Build a labeled preview like TCREI does
+      const lines = [];
+      if (description)  lines.push(`Description: ${description}`);
+      if (environment)  lines.push(`Environment: ${environment}`);
+      if (style)        lines.push(`Style: ${style}`);
+      if (illumination) lines.push(`Illumination: ${illumination}`);
+      if (gradation)    lines.push(`Quality/Gradation: ${gradation}`);
+      if (nuances)      lines.push(`Nuances: ${nuances}`);
+      if (references)   lines.push(`References: ${references}`);
 
       return {
-        text: parts.join(' '),
+        text: lines.join('\n'),
         description, environment, style, illumination, gradation, nuances, references
       };
     }
@@ -1383,15 +2072,7 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
       if (!obj.description?.trim()) issues.push('No description (subject & action).');
       if (!obj.environment?.trim()) issues.push('No environment/setting specified.');
       if (!obj.style?.trim())       issues.push('No artistic style/aesthetic specified.');
-      if (!obj.illumination?.trim())issues.push('No illumination/time-of-day specified.');
-      if (!/negative|avoid/i.test(obj.nuances||'')) {
-        issues.push('No negative prompts (e.g., “Negative: blurry, watermark, deformed”).');
-      }
-
-      // Soft suggestions:
-      if (!/(low angle|high angle|bird|over[- ]the[- ]shoulder|tilt|lens|mm|macro|wide|tele|close[- ]up|rule of thirds)/i.test(t)) {
-        issues.push('No camera/framing hints (optional: lens, angle, composition).');
-      }
+      if (!obj.illumination?.trim())issues.push('No illumination/time-of-day specified.');      
       if (/\b(nice|cool|good|thing|stuff)\b/i.test(t)) {
         issues.push('Ambiguous words detected (nice/cool/good/stuff). Be precise.');
       }
@@ -1407,10 +2088,13 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
     }
     function toggleTemplateVisibility() {
       const method = document.getElementById('methodSelector')?.value || 'tcrei';
-      const tcreiPresetWrap = document.getElementById('templatePreset')?.parentElement;
-      const agentTpl = document.getElementById('agentTemplate')?.parentElement;
-      if (tcreiPresetWrap) tcreiPresetWrap.style.display = (method === 'tcrei') ? 'inline' : 'none';
-      if (agentTpl) agentTpl.style.display = (method === 'agent') ? 'inline' : 'none';
+      const inline = document.querySelector('.inline-controls');
+      if (inline) inline.style.display = (method === 'tcrei') ? 'flex' : 'none';
+
+      // Agent template lives inside the Agent section — just let showMethodFields() handle it.
+      // If you still want to force show/hide the <select> container:
+      const agentTplWrap = document.getElementById('agentTemplate')?.closest('div');
+      if (agentTplWrap) agentTplWrap.style.display = (method === 'agent') ? '' : 'none';
     }
 
     // call on method change
@@ -1419,8 +2103,12 @@ ${scope || '{{in-scope list}}'}${outofscope ? `\n  (Out of scope)\n  ${outofscop
       toggleTemplateVisibility();
     });
 
-    // call once on load
-    document.addEventListener('DOMContentLoaded', toggleTemplateVisibility);
+    function stripPlaceholders(text){
+      return (text||'')
+        .replace(/^.*\{\{[^}]+\}\}.*$/gm, '')   // remove lines containing a {{placeholder}}
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }    
   </script>
 </body>
 </html>
