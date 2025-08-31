@@ -2,12 +2,6 @@
 /**
  * agent_prompt_utils.php
  * Utilities to generate and save the Agent Mode research/implementation prompt.
- *
- * Usage:
- *   require_once __DIR__ . '/agent_prompt_utils.php';
- *   $payload = oia_agent_prompt_payload(); // build payload
- *   $resp = oia_agent_prompt_save_http('https://YOUR-SITE/PATH/TO/save_prompt.php', $payload);
- *   if (!$resp['ok']) { /* handle error */ }
  */
 
 /**
