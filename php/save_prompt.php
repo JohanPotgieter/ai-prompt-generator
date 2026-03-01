@@ -54,7 +54,7 @@ $title            = trim((string)$data['title']);
 $generated_prompt = (string)$data['generated_prompt'];
 $prompt_data_arr  = $data['prompt_data'];
 
-$allowedTypes = ['ptcf', 'design', 'agent'];
+$allowedTypes = ['ptcf', 'design', 'agent', 'gem', 'code', 'notebook', 'fewshot'];
 if ($type === '' || !in_array($type, $allowedTypes, true)) {
     respond(400, ['ok' => false, 'error' => 'Invalid "type". Allowed: ' . implode(', ', $allowedTypes)]);
 }

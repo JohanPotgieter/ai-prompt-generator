@@ -5,7 +5,7 @@ ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
-require_once 'config.php';
+require_once __DIR__ . '/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -51,7 +51,7 @@ try {
     $include_del  = isset($_GET['include_deleted']) ? (int)$_GET['include_deleted'] : 0;
 
     // Allowed filters
-    $allowedTypes = ['All', 'ptcf', 'design', 'agent'];
+    $allowedTypes = ['ptcf', 'design', 'agent', 'gem', 'code', 'notebook', 'fewshot'];
     if (!in_array($type_filter, $allowedTypes, true)) $type_filter = 'All';
 
     if ($limit <= 0 || $limit > 50) $limit = 10;
