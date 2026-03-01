@@ -21,7 +21,10 @@ try {
     // --- Detect optional columns/indexes once ---
     $hasDeletedAt = false;
     $rs = $conn->query("SHOW COLUMNS FROM prompts LIKE 'deleted_at'");
-    if ($rs && $rs->num_rows > 0) { $hasDeletedAt = true; $rs->close(); }
+    if ($rs && $rs->num_rows > 0) {
+        $hasDeletedAt = true;
+        $rs->close();
+    }
 
     // Try to detect a FULLTEXT index on (title, generated_prompt)
     $hasFulltext = false;
@@ -30,7 +33,8 @@ try {
         while ($idx = $rs->fetch_assoc()) {
             // crude but fine: any FULLTEXT on either field qualifies
             if (strtolower($idx['Column_name']) === 'title' || strtolower($idx['Column_name']) === 'generated_prompt') {
-                $hasFulltext = true; break;
+                $hasFulltext = true;
+                break;
             }
         }
         $rs->close();
@@ -47,7 +51,7 @@ try {
     $include_del  = isset($_GET['include_deleted']) ? (int)$_GET['include_deleted'] : 0;
 
     // Allowed filters
-    $allowedTypes = ['All', 'tcrei', 'design', 'agent'];
+    $allowedTypes = ['All', 'ptcf', 'design', 'agent'];
     if (!in_array($type_filter, $allowedTypes, true)) $type_filter = 'All';
 
     if ($limit <= 0 || $limit > 50) $limit = 10;
@@ -102,7 +106,7 @@ try {
             $kw = trim(preg_replace('/\s+/', ' ', $keyword));
             // Convert to boolean query: +term* +term* ...
             $terms = preg_split('/\s+/', $kw);
-            $bool = implode(' ', array_map(function($t){
+            $bool = implode(' ', array_map(function ($t) {
                 // Keep quoted phrases as-is; otherwise prefix with + and suffix with *
                 if (preg_match('/^".+"$/', $t)) return $t;
                 // strip dangerous chars
@@ -183,13 +187,12 @@ try {
         'total_pages'   => $total_pages,
         'prompts'       => $prompts
     ]);
-
 } catch (mysqli_sql_exception $e) {
     error_log('ERROR (search_prompts): ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Failed to search prompts']);
 } finally {
-    if ($conn) { $conn->close(); }
+    if ($conn) {
+        $conn->close();
+    }
 }
-
-?>

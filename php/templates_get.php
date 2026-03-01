@@ -1,20 +1,25 @@
 <?php
 require_once __DIR__ . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
-function respond($s,$p){ http_response_code($s); echo json_encode($p, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); exit; }
+function respond($s, $p)
+{
+  http_response_code($s);
+  echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  exit;
+}
 
 $id  = isset($_GET['id'])  ? (int)$_GET['id'] : null;
 $key = $_GET['key'] ?? null;
 $category = $_GET['category'] ?? null;
 
 if (!$id && !($key && $category)) {
-  respond(400, ['ok'=>false,'error'=>'Provide id OR (category + key)']);
+  respond(400, ['ok' => false, 'error' => 'Provide id OR (category + key)']);
 }
-if ($key && !in_array($category, ['agent','tcrei','design'], true)) {
-  respond(400, ['ok'=>false,'error'=>'Invalid category']);
+if ($key && !in_array($category, ['agent', 'ptcf', 'design'], true)) {
+  respond(400, ['ok' => false, 'error' => 'Invalid category']);
 }
 
-if (!isset($conn) || !($conn instanceof mysqli)) respond(500, ['ok'=>false,'error'=>'DB not connected']);
+if (!isset($conn) || !($conn instanceof mysqli)) respond(500, ['ok' => false, 'error' => 'DB not connected']);
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
@@ -28,10 +33,10 @@ try {
   $st->execute();
   $r = $st->get_result()->fetch_assoc();
   $st->close();
-  if (!$r) respond(404, ['ok'=>false,'error'=>'Not found']);
+  if (!$r) respond(404, ['ok' => false, 'error' => 'Not found']);
   $r['payload'] = json_decode($r['payload'], true);
-  respond(200, ['ok'=>true,'template'=>$r]);
+  respond(200, ['ok' => true, 'template' => $r]);
 } catch (mysqli_sql_exception $e) {
-  error_log('[TPL_GET] '.$e->getMessage());
-  respond(500, ['ok'=>false,'error'=>'Failed to get template']);
+  error_log('[TPL_GET] ' . $e->getMessage());
+  respond(500, ['ok' => false, 'error' => 'Failed to get template']);
 }

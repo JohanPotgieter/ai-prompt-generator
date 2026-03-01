@@ -1,4 +1,5 @@
 <?php
+
 /**
  * agent_prompt_utils.php
  * Utilities to generate and save the Agent Mode research/implementation prompt.
@@ -8,7 +9,8 @@
  * Return the full Agent Mode prompt text (as a single large string).
  * This matches the “Prompt 3 – Agent Mode: Research & Implement With Sources” in your canvas.
  */
-function oia_agent_prompt_text(): string {
+function agent_prompt_text(): string
+{
     return <<<'PROMPT'
 ROLE & GOAL
 You are an autonomous engineering/research agent assisting Joe (casual tone). Your goal is to produce working, documented outputs and cite trustworthy sources.
@@ -71,11 +73,12 @@ PROMPT;
  * Build the payload your save endpoint expects.
  * If you’ve customized field names in save_prompt.php, adjust here.
  */
-function oia_agent_prompt_payload(array $overrides = []): array {
+function agent_prompt_payload(array $overrides = []): array
+{
     $defaults = [
         'type'             => 'Agent',
         'title'            => 'Agent Mode – Research & Implement With Sources',
-        'generated_prompt' => oia_agent_prompt_text(),
+        'generated_prompt' => agent_prompt_text(),
     ];
     return array_merge($defaults, $overrides);
 }
@@ -84,7 +87,8 @@ function oia_agent_prompt_payload(array $overrides = []): array {
  * POST JSON to save_prompt.php and return a structured result.
  * Returns: ['ok'=>bool, 'code'=>int, 'body'=>string, 'error'=>string|null]
  */
-function oia_agent_prompt_save_http(string $save_endpoint_url, array $payload, int $timeout = 20): array {
+function agent_prompt_save_http(string $save_endpoint_url, array $payload, int $timeout = 20): array
+{
     $ch = curl_init($save_endpoint_url);
     $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     curl_setopt_array($ch, [

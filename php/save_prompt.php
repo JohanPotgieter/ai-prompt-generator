@@ -10,9 +10,12 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 
-function respond(int $status, array $payload): void {
+function respond(int $status, array $payload): void
+{
     // Drop any accidental output before sending JSON
-    if (ob_get_level()) { ob_clean(); }
+    if (ob_get_level()) {
+        ob_clean();
+    }
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit();
@@ -51,7 +54,7 @@ $title            = trim((string)$data['title']);
 $generated_prompt = (string)$data['generated_prompt'];
 $prompt_data_arr  = $data['prompt_data'];
 
-$allowedTypes = ['tcrei', 'design', 'agent'];
+$allowedTypes = ['ptcf', 'design', 'agent'];
 if ($type === '' || !in_array($type, $allowedTypes, true)) {
     respond(400, ['ok' => false, 'error' => 'Invalid "type". Allowed: ' . implode(', ', $allowedTypes)]);
 }
@@ -98,11 +101,12 @@ try {
         $q->bind_result($created_at);
         $q->fetch();
         $q->close();
-    } catch (mysqli_sql_exception $e) {}
+    } catch (mysqli_sql_exception $e) {
+    }
 
     respond(200, [
         'ok'     => true,
-        'message'=> 'Prompt saved successfully!',
+        'message' => 'Prompt saved successfully!',
         'prompt' => [
             'id'               => $last_id,
             'type'             => $type,
@@ -112,11 +116,14 @@ try {
             'created_at'       => $created_at ?: date('c'),
         ],
     ]);
-
 } catch (mysqli_sql_exception $e) {
     error_log('[SAVE_PROMPT_ERROR] ' . $e->getMessage());
     respond(500, ['ok' => false, 'error' => DEBUG ? ('DB error: ' . $e->getMessage()) : 'Failed to save prompt']);
 } finally {
-    if (isset($stmt) && $stmt instanceof mysqli_stmt) { $stmt->close(); }
-    if (isset($conn) && $conn instanceof mysqli) { $conn->close(); }
+    if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+        $stmt->close();
+    }
+    if (isset($conn) && $conn instanceof mysqli) {
+        $conn->close();
+    }
 }
