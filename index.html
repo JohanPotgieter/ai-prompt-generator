@@ -92,6 +92,9 @@
         <div class="tab" data-method="fewshot" onclick="switchTab('fewshot')">
           Few Shot
         </div>
+        <div class="tab" data-method="deep" onclick="switchTab('deep')">
+          Deep Research
+        </div>
       </div>
       <select id="methodSelector" style="display: none">
         <option value="ptcf">ptcf</option>
@@ -101,6 +104,7 @@
         <option value="code">code</option>
         <option value="notebook">notebook</option>
         <option value="fewshot">fewshot</option>
+        <option value="deep">deep</option>
       </select>
       <hr />
 
@@ -504,6 +508,56 @@
               style="margin-top: 20px"
             >
               Generate Few-Shot Prompt & Save
+            </button>
+          </div>
+          <div id="deepMethod" class="method-section">
+            <h2>Deep Research (Autonomous Web Agents)</h2>
+            <p>
+              Direct an AI on how to navigate the web, what sources to trust,
+              and how to resolve conflicting information.
+            </p>
+
+            <div class="section-title">Core Objective</div>
+            <label for="deep_hypothesis">Core Question / Hypothesis:</label>
+            <textarea
+              id="deep_hypothesis"
+              placeholder="e.g., Write a comprehensive report on the adoption of solar energy in Australia in 2025."
+            ></textarea>
+
+            <label for="deep_subtopics"
+              >Sub-topics to Explore (The Rabbit Holes):</label
+            >
+            <textarea
+              id="deep_subtopics"
+              placeholder="e.g., 1) Supply chain bottlenecks. 2) Impact of government rebates. 3) Grid stability challenges."
+            ></textarea>
+
+            <div class="section-title">Source Navigation</div>
+            <label for="deep_trusted">Trusted Domains & Priorities:</label>
+            <textarea
+              id="deep_trusted"
+              placeholder="e.g., Prioritize primary sources, official government sites (.gov.au), and peer-reviewed journals."
+            ></textarea>
+
+            <label for="deep_excluded">Excluded Domains & Mediums:</label>
+            <textarea
+              id="deep_excluded"
+              placeholder="e.g., Explicitly exclude opinion blogs, forum posts (Reddit, Quora), and outdated documentation from before 2023."
+            ></textarea>
+
+            <div class="section-title">Analysis Rules</div>
+            <label for="deep_contradictions">Contradiction Protocol:</label>
+            <textarea
+              id="deep_contradictions"
+              placeholder="e.g., If sources conflict, do not average them. Present a markdown table comparing the claims with citations, and analyze the discrepancy."
+            ></textarea>
+
+            <button
+              type="button"
+              onclick="generatePromptAndSave('deep')"
+              style="margin-top: 20px"
+            >
+              Generate Deep Research Prompt & Save
             </button>
           </div>
           <!-- DESIGN (your existing fields stay; you can mirror preview later if you want) -->
@@ -1816,6 +1870,11 @@
             <option value="ptcf">ptcf</option>
             <option value="design">DESIGN</option>
             <option value="agent">AGENT</option>
+            <option value="gem">GEM Builder</option>
+            <option value="code">Code Companion</option>
+            <option value="notebook">NotebookLM</option>
+            <option value="fewshot">Few-Shot</option>
+            <option value="deep">Deep Research</option>
           </select>
         </div>
 
@@ -1893,8 +1952,8 @@
         Clear ALL Saved Prompts (from Database)
       </button>
       <div class="meta">
-        <strong>Last updated:</strong> 01-03-2026 19:00 AEST •
-        <strong>Author:</strong> Joe Potgieter
+        <strong>Last updated:</strong> 02-03-2026 22:00 AEST •
+        <strong>Author:</strong> Joe Potgieter & Gemini AI Labs
       </div>
     </div>
   </body>

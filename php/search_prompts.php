@@ -51,7 +51,7 @@ try {
     $include_del  = isset($_GET['include_deleted']) ? (int)$_GET['include_deleted'] : 0;
 
     // Allowed filters
-    $allowedTypes = ['ptcf', 'design', 'agent', 'gem', 'code', 'notebook', 'fewshot'];
+    $allowedTypes = ['ptcf', 'design', 'agent', 'gem', 'code', 'notebook', 'fewshot', 'deep'];
     if (!in_array($type_filter, $allowedTypes, true)) $type_filter = 'All';
 
     if ($limit <= 0 || $limit > 50) $limit = 10;

@@ -1354,8 +1354,15 @@ async function generatePromptAndSave(method) {
     }
     combinedPrompt = obj.text;
     Object.assign(promptData, obj);
+  } else if (method === "deep") {
+    const obj = buildDeepObj();
+    if (!obj.text?.trim()) {
+      showAlert("Fill some Deep Research fields first.", "warning");
+      return;
+    }
+    combinedPrompt = obj.text;
+    Object.assign(promptData, obj);
   }
-
   if (!combinedPrompt) return;
 
   let saveToDB = true,
@@ -1370,7 +1377,15 @@ async function generatePromptAndSave(method) {
 
   if (saveToDB) {
     const date = new Date();
-    const dbSaveTitle = `${method.toUpperCase()} Prompt - ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+
+    // Strict dd/mm/yyyy formatting
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const y = date.getFullYear();
+    const formattedDate = `${d}/${m}/${y}`;
+    const formattedTime = date.toLocaleTimeString("en-AU");
+
+    const dbSaveTitle = `${method.toUpperCase()} Prompt - ${formattedDate} ${formattedTime}`;
     const payload = {
       type: method,
       title: dbSaveTitle,
@@ -1380,7 +1395,7 @@ async function generatePromptAndSave(method) {
     const saved = await savePromptToDB(payload);
 
     if (saved && saved.id) {
-      sessionPromptTitle = `${method.toUpperCase()} Session Prompt ${++sessionPromptCounter} - ${date.toLocaleTimeString()}`;
+      sessionPromptTitle = `${method.toUpperCase()} Session Prompt ${++sessionPromptCounter} - ${formattedTime}`;
       addPromptToAccordion(
         sessionPromptTitle,
         combinedPrompt,
@@ -1557,18 +1572,42 @@ async function searchPrompts(page = 1, isSearchButtonClicked = false) {
 function restorePrompt(data) {
   clearFormFields();
   lastRestoredPromptData = data;
-  const method = data.method;
-  document.getElementById("methodSelector").value = method;
-  showMethodFields();
+  const method = data.method || "ptcf";
 
+  // 1. Switch the hidden dropdown
+  const methodSel = document.getElementById("methodSelector");
+  if (methodSel) methodSel.value = method;
+
+  // 2. Update the UI tabs visually to match
+  document.querySelectorAll(".tab").forEach((tab) => {
+    if (tab.dataset.method === method) {
+      tab.classList.add("active");
+    } else {
+      tab.classList.remove("active");
+    }
+  });
+
+  // 3. Unhide the correct section
+  if (typeof showMethodFields === "function") showMethodFields();
+  if (typeof toggleTemplateVisibility === "function")
+    toggleTemplateVisibility();
+
+  // 4. Restore the specific fields based on the method
   if (method === "ptcf") {
     document.getElementById("ptcf_task").value = data.task || "";
     document.getElementById("ptcf_format").value = data.format || "";
     document.getElementById("ptcf_context").value = data.context || "";
     document.getElementById("ptcf_references").value = data.references || "";
     document.getElementById("ptcf_iterate").value = data.iterate || "";
-    document.getElementById("ptcf_add_tags").checked = !!data.addTags;
-  } else {
+    const tagsToggle = document.getElementById("ptcf_add_tags");
+    if (tagsToggle) tagsToggle.checked = !!data.addTags;
+
+    document.getElementById("varAudience").value = data.vars?.audience || "";
+    document.getElementById("varTone").value = data.vars?.tone || "";
+    document.getElementById("varLength").value = data.vars?.length || "";
+    const modeSel = document.getElementById("modeSelector");
+    if (modeSel) modeSel.value = data.mode || "";
+  } else if (method === "design") {
     document.getElementById("design_description").value =
       data.description || "";
     document.getElementById("design_environment").value =
@@ -1580,20 +1619,20 @@ function restorePrompt(data) {
     document.getElementById("design_nuances").value = data.nuances || "";
     document.getElementById("design_references").value = data.references || "";
     if (data.pod) {
-      pod_product.value = data.pod.product || "tshirt";
-      pod_units.value = data.pod.units || "in";
-      pod_dpi.value = data.pod.dpi ?? 300;
-      pod_bleed.value = data.pod.bleedPct ?? 0;
-      pod_safe.value = data.pod.safePct ?? 3;
-      pod_aspect.value = data.pod.aspect || "";
-      pod_bg.value = data.pod.bg || "transparent";
-
+      document.getElementById("pod_product").value =
+        data.pod.product || "tshirt";
+      document.getElementById("pod_units").value = data.pod.units || "in";
+      document.getElementById("pod_dpi").value = data.pod.dpi ?? 300;
+      document.getElementById("pod_bleed").value = data.pod.bleedPct ?? 0;
+      document.getElementById("pod_safe").value = data.pod.safePct ?? 3;
+      document.getElementById("pod_aspect").value = data.pod.aspect || "";
+      document.getElementById("pod_bg").value = data.pod.bg || "transparent";
       if ((data.pod.units || "in") === "px") {
-        pod_w.value = data.pod.pixels?.width ?? "";
-        pod_h.value = data.pod.pixels?.height ?? "";
+        document.getElementById("pod_w").value = data.pod.pixels?.width ?? "";
+        document.getElementById("pod_h").value = data.pod.pixels?.height ?? "";
       } else {
-        pod_w.value = data.pod.wIn ?? "";
-        pod_h.value = data.pod.hIn ?? "";
+        document.getElementById("pod_w").value = data.pod.wIn ?? "";
+        document.getElementById("pod_h").value = data.pod.hIn ?? "";
       }
       try {
         computePodPixels();
@@ -1607,7 +1646,65 @@ function restorePrompt(data) {
       document.getElementById("gen_sampler").value = data.gen.sampler || "";
       document.getElementById("gen_cfg").value = data.gen.cfg || "7.5";
     }
+  } else if (method === "agent") {
+    document.getElementById("agent_objective").value = data.objective || "";
+    document.getElementById("agent_success").value = data.success || "";
+    document.getElementById("agent_scope").value = data.scope || "";
+    document.getElementById("agent_outofscope").value = data.outofscope || "";
+    document.getElementById("agent_constraints").value = data.constraints || "";
+    document.getElementById("agent_env").value = data.env || "";
+    document.getElementById("agent_extra_sources").value =
+      data.extraVendors || "";
+  } else if (method === "gem") {
+    document.getElementById("gem_role").value = data.role || "";
+    document.getElementById("gem_task").value = data.task || "";
+    document.getElementById("gem_context").value = data.context || "";
+    document.getElementById("gem_rules").value = data.rules || "";
+    document.getElementById("gem_format").value = data.format || "";
+    document.getElementById("gem_greeting").value = data.greeting || "";
+    const headerToggle = document.getElementById("gem_add_headers");
+    if (headerToggle) headerToggle.checked = data.addHeaders !== false;
+  } else if (method === "code") {
+    document.getElementById("code_framework").value = data.framework || "";
+    document.getElementById("code_operation").value = data.operation || "";
+    document.getElementById("code_requirements").value =
+      data.requirements || "";
+    document.getElementById("code_input").value = data.codeInput || "";
+    const strictToggle = document.getElementById("code_strict");
+    if (strictToggle) strictToggle.checked = data.strict !== false;
+  } else if (method === "notebook") {
+    document.getElementById("notebook_focus").value = data.focus || "";
+    document.getElementById("notebook_connection").value =
+      data.connection || "";
+    document.getElementById("notebook_audio").value = data.audio || "";
+    document.getElementById("notebook_format").value = data.format || "";
+  } else if (method === "fewshot") {
+    document.getElementById("fewshot_system").value = data.system || "";
+    document.getElementById("fewshot_schema").value = data.schema || "";
+    const container = document.getElementById("fewshot_examples_container");
+    if (container) container.innerHTML = "";
+
+    if (data.examples && data.examples.length) {
+      data.examples.forEach((ex) => {
+        if (typeof addFewShotExample === "function")
+          addFewShotExample(ex.input, ex.output);
+      });
+    } else {
+      if (typeof addFewShotExample === "function") addFewShotExample();
+    }
+  } else if (method === "deep") {
+    document.getElementById("deep_hypothesis").value = data.hypothesis || "";
+    document.getElementById("deep_subtopics").value = data.subtopics || "";
+    document.getElementById("deep_trusted").value = data.trusted || "";
+    document.getElementById("deep_excluded").value = data.excluded || "";
+    document.getElementById("deep_contradictions").value =
+      data.contradictions || "";
   }
+
+  // 5. Re-trigger auto-expand so the textareas resize to fit the loaded data
+  if (typeof initializeAutoExpand === "function") initializeAutoExpand();
+
+  // 6. Update the preview and scroll to top
   renderPreview();
   showAlert("Prompt loaded for editing.", "success");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1623,6 +1720,7 @@ function showMethodFields() {
     code: "codeMethod",
     notebook: "notebookMethod",
     fewshot: "fewshotMethod",
+    deep: "deepMethod",
   };
   [
     "ptcfMethod",
@@ -1632,6 +1730,7 @@ function showMethodFields() {
     "codeMethod",
     "notebookMethod",
     "fewshotMethod",
+    "deepMethod",
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1743,7 +1842,7 @@ function listAllPrompts() {
 function changePage(d) {
   const p = currentSearchPage + d;
   if (p >= 1 && p <= totalPages) {
-    searchPrompts(p, true);
+    searchPrompts(p, false); // <--- Changed to false!
   }
 }
 
@@ -1826,7 +1925,12 @@ document.addEventListener("DOMContentLoaded", () => {
     "notebook_audio",
     "notebook_format",
     "fewshot_system",
-    "fewshot_schema", // Added the new Few-Shot fields!
+    "fewshot_schema",
+    "deep_hypothesis",
+    "deep_subtopics",
+    "deep_trusted",
+    "deep_excluded",
+    "deep_contradictions",
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -2045,6 +2149,9 @@ function renderPreview() {
     } else if (method === "fewshot") {
       if (typeof buildFewShotObj === "function")
         obj = buildFewShotObj() || { text: "" };
+    } else if (method === "deep") {
+      if (typeof buildDeepObj === "function")
+        obj = buildDeepObj() || { text: "" };
     }
   } catch (err) {
     console.error("Error building prompt object for preview:", err);
@@ -2211,6 +2318,16 @@ function currentPromptData() {
       format: val("notebook_format"),
     };
   }
+  if (method === "deep") {
+    return {
+      method,
+      hypothesis: val("deep_hypothesis"),
+      subtopics: val("deep_subtopics"),
+      trusted: val("deep_trusted"),
+      excluded: val("deep_excluded"),
+      contradictions: val("deep_contradictions"),
+    };
+  }
   return { method };
 }
 
@@ -2334,8 +2451,14 @@ function restoreDraft() {
     } else {
       if (typeof addFewShotExample === "function") addFewShotExample(); // Add one blank pair
     }
+  } else if (d.method === "deep") {
+    document.getElementById("deep_hypothesis").value = d.hypothesis || "";
+    document.getElementById("deep_subtopics").value = d.subtopics || "";
+    document.getElementById("deep_trusted").value = d.trusted || "";
+    document.getElementById("deep_excluded").value = d.excluded || "";
+    document.getElementById("deep_contradictions").value =
+      d.contradictions || "";
   }
-
   if (typeof initializeAutoExpand === "function") initializeAutoExpand();
   renderPreview();
   showAlert("Draft restored.", "success");
@@ -2575,6 +2698,9 @@ function buildActiveObj() {
   if (method === "fewshot") {
     if (typeof buildFewShotObj === "function") return buildFewShotObj();
   }
+  if (method === "deep") {
+    if (typeof buildDeepObj === "function") return buildDeepObj();
+  }
   return { text: "" };
 }
 
@@ -2771,7 +2897,47 @@ function addFewShotExample(inVal = "", outVal = "") {
   renderPreview();
   scheduleAutosave();
 }
+function buildDeepObj() {
+  if (document.getElementById("methodSelector").value !== "deep")
+    return { text: "" };
+  const get = (id) => (document.getElementById(id)?.value || "").trim();
 
+  const hypothesis = get("deep_hypothesis");
+  const subtopics = get("deep_subtopics");
+  const trusted = get("deep_trusted");
+  const excluded = get("deep_excluded");
+  const contradictions = get("deep_contradictions");
+
+  const parts = [];
+  if (hypothesis) parts.push(`CORE RESEARCH OBJECTIVE:\n${hypothesis}`);
+  if (subtopics)
+    parts.push(`REQUIRED SUB-TOPICS (Explore these thoroughly):\n${subtopics}`);
+
+  if (trusted || excluded) {
+    parts.push(`--- SOURCE BOUNDARIES ---`);
+    if (trusted) parts.push(`Trusted Sources / Priorities:\n${trusted}`);
+    if (excluded) parts.push(`Explicit Exclusions:\n${excluded}`);
+  }
+
+  if (contradictions)
+    parts.push(
+      `--- ANALYSIS PROTOCOL ---\nContradiction Handling:\n${contradictions}`,
+    );
+
+  // Standard Deep Research safety/stop condition
+  parts.push(
+    `--- EXECUTION RULES ---\nDo not stop researching until you have thoroughly explored all sub-topics using the approved source boundaries. Provide inline citations [Source Name](URL) for every factual claim.`,
+  );
+
+  return {
+    text: parts.join("\n\n"),
+    hypothesis,
+    subtopics,
+    trusted,
+    excluded,
+    contradictions,
+  };
+}
 function buildFewShotObj() {
   if (document.getElementById("methodSelector").value !== "fewshot")
     return { text: "" };
