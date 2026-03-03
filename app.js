@@ -1666,7 +1666,10 @@ function restorePrompt(data) {
     if (headerToggle) headerToggle.checked = data.addHeaders !== false;
   } else if (method === "code") {
     document.getElementById("code_framework").value = data.framework || "";
+    document.getElementById("code_persona").value = data.persona || ""; // <-- NEW
     document.getElementById("code_operation").value = data.operation || "";
+    document.getElementById("code_style").value = data.style || ""; // <-- NEW
+    document.getElementById("code_logging").value = data.logging || ""; // <-- NEW
     document.getElementById("code_requirements").value =
       data.requirements || "";
     document.getElementById("code_input").value = data.codeInput || "";
@@ -1916,7 +1919,10 @@ document.addEventListener("DOMContentLoaded", () => {
     "gem_greeting",
     "gem_add_headers",
     "code_framework",
+    "code_persona", // <-- ADDED
     "code_operation",
+    "code_style", // <-- ADDED
+    "code_logging", // <-- ADDED
     "code_requirements",
     "code_input",
     "code_strict",
@@ -2288,7 +2294,10 @@ function currentPromptData() {
     return {
       method,
       framework: val("code_framework"),
+      persona: val("code_persona"), // <-- NEW
       operation: val("code_operation"),
+      style: val("code_style"), // <-- NEW
+      logging: val("code_logging"), // <-- NEW
       requirements: val("code_requirements"),
       codeInput: val("code_input"),
       strict: checked("code_strict"),
@@ -2427,7 +2436,10 @@ function restoreDraft() {
     if (headerToggle) headerToggle.checked = d.addHeaders !== false;
   } else if (d.method === "code") {
     document.getElementById("code_framework").value = d.framework || "";
+    document.getElementById("code_persona").value = d.persona || ""; // <-- NEW
     document.getElementById("code_operation").value = d.operation || "";
+    document.getElementById("code_style").value = d.style || ""; // <-- NEW
+    document.getElementById("code_logging").value = d.logging || ""; // <-- NEW
     document.getElementById("code_requirements").value = d.requirements || "";
     document.getElementById("code_input").value = d.codeInput || "";
     const strictToggle = document.getElementById("code_strict");
@@ -2809,16 +2821,34 @@ function buildCodeObj() {
   const get = (id) => (document.getElementById(id)?.value || "").trim();
 
   const framework = get("code_framework");
+  const persona = get("code_persona"); // <-- NEW
   const operation = get("code_operation");
+  const style = get("code_style"); // <-- NEW
+  const logging = get("code_logging"); // <-- NEW
   const requirements = get("code_requirements");
   const codeInput = get("code_input");
   const strict = !!document.getElementById("code_strict")?.checked;
 
   const parts = [];
-  if (framework)
-    parts.push(`Context: You are an expert ${framework} developer.`);
+
+  // Dynamically build the Persona/Context sentence
+  let contextStr = "Context: You are an expert";
+  if (framework) contextStr += ` ${framework}`;
+  if (persona) contextStr += ` ${persona}`;
+  else contextStr += " developer";
+  parts.push(contextStr + ".");
+
   if (operation) parts.push(`Task: ${operation}`);
   if (requirements) parts.push(`Requirements:\n${requirements}`);
+
+  // Inject the new Standards and Logging block
+  if (style || logging) {
+    let standardsStr = "Standards & Style:\n";
+    if (style) standardsStr += `- ${style}\n`;
+    if (logging) standardsStr += `- ${logging}\n`;
+    parts.push(standardsStr.trim());
+  }
+
   if (codeInput) parts.push(`Current Code:\n\`\`\`\n${codeInput}\n\`\`\``);
 
   if (strict) {
@@ -2830,7 +2860,10 @@ function buildCodeObj() {
   return {
     text: parts.join("\n\n"),
     framework,
+    persona, // <-- NEW
     operation,
+    style, // <-- NEW
+    logging, // <-- NEW
     requirements,
     codeInput,
     strict,

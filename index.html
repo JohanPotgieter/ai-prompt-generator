@@ -377,6 +377,13 @@
               placeholder="e.g., PHP 8.2, Flutter/Dart, Python 3"
             />
 
+            <label for="code_persona">Expert Persona:</label>
+            <input
+              type="text"
+              id="code_persona"
+              placeholder="e.g., Senior Plugin Developer, Security Auditor"
+            />
+
             <label for="code_operation">Operation Type:</label>
             <textarea
               id="code_operation"
@@ -391,6 +398,18 @@
               id="code_requirements"
               placeholder="e.g., Do not change the function signature. Must use PDO for database calls."
             ></textarea>
+
+            <label for="code_style">Coding Standards & Style:</label>
+            <input
+              type="text"
+              id="code_style"
+              placeholder="e.g. PSR-12, snake_case, Aussie dates"
+            />
+
+            <label for="code_logging">Error Handling & Logging:</label>
+            <textarea id="code_logging">
+Use oia_log_aest($message, 'error', $context); return false on failure.</textarea
+            >
 
             <label for="code_input">Current Code (Paste here):</label>
             <textarea
