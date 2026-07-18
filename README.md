@@ -18,34 +18,15 @@ Ensure the following tables exist within your database (using the environment-sp
 
 | File / Component | Description |
 | --- | --- |
-| `agent_prompt_utils.php` | Utility functions that generate the comprehensive "Agent Mode" research prompt and push it to the save endpoint via HTTP using cURL.
-
- |
-| `clear_all_prompts.php` | Clears all entries from the `prompts` table with a secure `DELETE` query wrapped in a database transaction.
-
- |
-| `delete_prompt.php` | Deletes a single prompt by its integer `id` using a prepared statement with a `LIMIT 1` guard.
-
- |
-| `save_prompt.php` | Validates and inserts new prompts. It enforces a 1MB payload limit and restricts types to specific categories like `agent`, `design`, `code`, and `ptcf`.
-
- |
-| `search_prompts.php` | Searches prompts with pagination, sorting, and dynamic fallback between `FULLTEXT` boolean matching and `LIKE` queries based on available indexes.
-
- |
-| Template Deletion | Soft-deletes prompt templates by setting `is_active=0`, locating records by `id` or a `category` and `key` combination.
-
- |
-| Template Retrieval | Fetches a single prompt template by its `id` or `key`/`category` combination and decodes its JSON payload.
-
- |
-| Template Listing | Returns a list of all active (`is_active=1`) templates for a given category, properly ordered by `sort_order` and `label`.
-
- |
-| Template Upsert | Inserts or updates templates using `ON DUPLICATE KEY UPDATE` to maintain keys, versions, and payload configurations without creating duplicates.
-
- |
-
+| `agent_prompt_utils.php` | Utility functions that generate the comprehensive "Agent Mode" research prompt and push it to the save endpoint via HTTP using cURL.|
+| `clear_all_prompts.php` | Clears all entries from the `prompts` table with a secure `DELETE` query wrapped in a database transaction.|
+| `delete_prompt.php` | Deletes a single prompt by its integer `id` using a prepared statement with a `LIMIT 1` guard.|
+| `save_prompt.php` | Validates and inserts new prompts. It enforces a 1MB payload limit and restricts types to specific categories like `agent`, `design`, `code`, and `ptcf`.|
+| `search_prompts.php` | Searches prompts with pagination, sorting, and dynamic fallback between `FULLTEXT` boolean matching and `LIKE` queries based on available indexes.|
+| Template Deletion | Soft-deletes prompt templates by setting `is_active=0`, locating records by `id` or a `category` and `key` combination.|
+| Template Retrieval | Fetches a single prompt template by its `id` or `key`/`category` combination and decodes its JSON payload.|
+| Template Listing | Returns a list of all active (`is_active=1`) templates for a given category, properly ordered by `sort_order` and `label`.|
+| Template Upsert | Inserts or updates templates using `ON DUPLICATE KEY UPDATE` to maintain keys, versions, and payload configurations without creating duplicates.|
 ---
 
 ### Security & Performance Guidelines
